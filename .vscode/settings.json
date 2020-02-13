@@ -1,0 +1,11 @@
+{
+  "files.associations": {
+    "*.oc": "c",
+    "*.oh": "c",
+    "verifiable_secret_sharing.h": "c",
+    "secp256k1_algebra.h": "c",
+    "threshold_tree_access_structure.c": "cpp",
+    "nikmak_ecdsa_mpc_poc.h": "c",
+    "objects.h": "c"
+  }
+}
