@@ -1,10 +1,11 @@
 #include "nikmak_ecdsa_mpc_poc.h"
+#include <assert.h>
 
-group_ctx_t *ctx;
+protocol_ctx_t *ctx;
 
 int main()
 {
-  ctx = group_ctx_new();
-  
-  group_ctx_free(ctx);  
+  ctx = protocol_ctx_new();
+
+  protocol_ctx_free(ctx);  
 }

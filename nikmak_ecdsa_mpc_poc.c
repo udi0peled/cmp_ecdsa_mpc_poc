@@ -3,44 +3,31 @@
 #include <string.h>
 #include <assert.h>
 
-#include <openssl/bn.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
-#include <openssl/ec.h>
 #include <openssl/objects.h>
 
 #define PAILLIER_FACTOR_BYTES (4 * GROUP_ORDER_BYTES)
 
-typedef EC_POINT *group_element;
-typedef BIGNUM *scalar;
-
-struct group_ctx 
+struct protocol_ctx 
 {
   EC_GROUP *ec;
+  BN_CTX *bn_ctx;
+
   const BIGNUM *q;
   const EC_POINT *G;
-  EC_POINT *H;
+  group_el_t H;
+
+  const char* sid;
 };
 
-struct paillier_public_key
+protocol_ctx_t *protocol_ctx_new()
 {
-  uint8_t N[2*PAILLIER_FACTOR_BYTES];
-  uint8_t N2[4*PAILLIER_FACTOR_BYTES];
-};
-
-struct paillier_private_key
-{
-  struct paillier_public_key pub;
-  uint8_t p[PAILLIER_FACTOR_BYTES];
-  uint8_t q[PAILLIER_FACTOR_BYTES];
-  uint8_t lcm[PAILLIER_FACTOR_BYTES];    // exponent in decryption
-  uint8_t mu[2*PAILLIER_FACTOR_BYTES];   // multiplicative factor in decryption
-};
-
-group_ctx_t *group_ctx_new()
-{
-  group_ctx_t *gr_ctx = malloc(sizeof(group_ctx_t));
+  protocol_ctx_t *gr_ctx = malloc(sizeof(protocol_ctx_t));
   gr_ctx->ec = EC_GROUP_new_by_curve_name(GROUP_ID);
+
+  gr_ctx->bn_ctx = BN_CTX_new();
+
   gr_ctx->q = EC_GROUP_get0_order(gr_ctx->ec);
   gr_ctx->G = EC_GROUP_get0_generator(gr_ctx->ec);
 
@@ -61,13 +48,17 @@ group_ctx_t *group_ctx_new()
   gr_ctx->H = EC_POINT_new(gr_ctx->ec);
   assert(EC_POINT_oct2point(gr_ctx->ec, gr_ctx->H, point_buffer, GROUP_COMPRESSED_POINT_BYTES, NULL) == 1);
   
+  // Set session id (fixed throughout benchmarking)
+  gr_ctx->sid = "Fireblocks - Benchmarking NikMak MPC";
+
   return gr_ctx;
 }
 
-void group_ctx_free(group_ctx_t *ctx)
+void protocol_ctx_free(protocol_ctx_t *ctx)
 {
   EC_POINT_free(ctx->H);
   EC_GROUP_free(ctx->ec);
+  BN_CTX_free(ctx->bn_ctx);
   free(ctx);
 }
 
