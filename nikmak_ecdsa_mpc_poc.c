@@ -8,6 +8,7 @@
 #include <openssl/objects.h>
 
 #define PAILLIER_FACTOR_BYTES (4 * GROUP_ORDER_BYTES)
+#define PAILLIER_FACTOR_BITS  (8 * PAILLIER_FACTOR_BYTES)
 
 protocol_ctx_t *protocol_ctx_new()
 {
@@ -69,9 +70,22 @@ void group_el_free(group_el_t el)
   EC_POINT_clear_free(el);
 }
 
-void sample_in_range(const scalar_t range_mod, scalar_t rnd)
+void sample_in_range(const protocol_ctx_t *ctx, const scalar_t range_mod, scalar_t rnd, int coprime)
 {
   BN_rand_range(rnd, range_mod);
+
+  if (coprime)
+  { 
+    BIGNUM *gcd = BN_new();
+    BN_gcd(gcd, range_mod, rnd, ctx->bn_ctx);
+    
+    while (!BN_is_one(gcd))
+    {
+      BN_rand_range(rnd, range_mod);
+      BN_gcd(gcd, range_mod, rnd, ctx);
+    }
+    BN_clear_free(gcd);
+  }
 }
 
 void sample_safe_prime(unsigned int bits, scalar_t prime)
@@ -113,8 +127,8 @@ void paillier_encryption_generate_new_keys  (const protocol_ctx_t *ctx, paillier
   priv->pub.N   = scalar_new(ctx);
   priv->pub.N2  = scalar_new(ctx);
 
-  sample_safe_prime(32*GROUP_ORDER_BYTES, priv->p); // 4 x group order bits
-  sample_safe_prime(32*GROUP_ORDER_BYTES, priv->q); // each
+  sample_safe_prime(PAILLIER_FACTOR_BITS, priv->p); // 4 x group order bits
+  sample_safe_prime(PAILLIER_FACTOR_BITS, priv->q); // each
 
   BN_mul(priv->pub.N, priv->p, priv->q, ctx->bn_ctx);
   BN_sqr(priv->pub.N2, priv->pub.N, ctx->bn_ctx);
@@ -140,4 +154,36 @@ void paillier_encryption_free_keys (paillier_public_key_t *pub, paillier_private
   scalar_free(priv->mu);
   scalar_free(priv->pub.N);
   scalar_free(priv->pub.N2);
+}
+
+void paillier_encryption_sample(const protocol_ctx_t *ctx, const paillier_public_key_t *pub, scalar_t rho, int sample_coprime)
+{
+  sample_in_range(ctx, pub->N, rho, sample_coprime);
+}
+
+void paillier_encryption_encrypt(const protocol_ctx_t *ctx, const paillier_public_key_t *pub, const scalar_t plaintext, const scalar_t rho, scalar_t ciphertext)
+{
+  BIGNUM *first_factor = BN_new();
+  
+  BN_mod_mul(first_factor, pub->N, plaintext, pub->N2, ctx->bn_ctx);
+  BN_add_word(first_factor, 1);
+
+  BN_mod_exp(ciphertext, rho, pub->N, pub->N2, ctx->bn_ctx);
+  BN_mod_mul(ciphertext, first_factor, ciphertext, pub->N2, ctx->bn_ctx);
+
+  BN_clear_free(first_factor);
+}
+
+void paillier_encryption_decrypt(const protocol_ctx_t *ctx, const paillier_private_key_t *priv, const scalar_t ciphertext, scalar_t plaintext)
+{
+   BN_mod_exp(plaintext, ciphertext, priv->lambda, priv->pub.N2, ctx->bn_ctx);
+   BN_sub_word(plaintext, 1);
+   BN_div(plaintext, NULL, plaintext, priv->pub.N, ctx->bn_ctx);
+   BN_mod_mul(plaintext, plaintext, priv->mu, priv->pub.N2, ctx->bn_ctx);
+}
+
+void paillier_encryption_homomorphic(const protocol_ctx_t *ctx, const paillier_public_key_t *pub, const scalar_t ciphertext, const scalar_t factor, const scalar_t add_cipher, scalar_t new_cipher)
+{
+  BN_mod_exp(new_cipher, ciphertext, factor, pub->N2, ctx->bn_ctx);
+  BN_mod_mul(new_cipher, new_cipher, add_cipher, pub->N2, ctx->bn_ctx);
 }

@@ -226,13 +226,13 @@ typedef enum {
 protocol_ctx_t *protocol_ctx_new ();
 void            protocol_ctx_free(protocol_ctx_t *ctx);
 
-scalar_t scalar_new  (const protocol_ctx_t *ctx);
+scalar_t scalar_new(const protocol_ctx_t *ctx);
 void scalar_free (scalar_t el);
 
 group_el_t group_el_new (const protocol_ctx_t *ctx);
 void group_el_free(group_el_t el);
 
-void sample_in_range(const scalar_t range_mod, scalar_t rnd);
+void sample_in_range(const protocol_ctx_t *ctx, const scalar_t range_mod, scalar_t rnd, int coprime);
 
 void fiat_shamir_hash(const protocol_ctx_t *ctx, const uint8_t *data, const uint64_t data_len, uint8_t digest[FIAT_SHAMIR_DIGEST_BYTES]);
 
@@ -241,11 +241,11 @@ void group_exponentiation     (const protocol_ctx_t *ctx, const group_el_t a, co
 void group_pedersen_commitment(const protocol_ctx_t *ctx, const scalar_t alpha, const scalar_t beta, group_el_t ped_com);
 
 void paillier_encryption_generate_new_keys  (const protocol_ctx_t *ctx, paillier_public_key_t *pub, paillier_private_key_t *priv);
-void paillier_encryption_sample             (const protocol_ctx_t *ctx, scalar_t rho, int sample_coprime);
-void paillier_encryption_encrypt            (const protocol_ctx_t *ctx, const paillier_public_key_t *pub, const scalar_t plaintext, scalar_t ciphertext);
+void paillier_encryption_free_keys          (paillier_public_key_t *pub, paillier_private_key_t *priv);
+void paillier_encryption_sample             (const protocol_ctx_t *ctx, const paillier_public_key_t *pub, scalar_t rho, int sample_coprime);
+void paillier_encryption_encrypt            (const protocol_ctx_t *ctx, const paillier_public_key_t *pub, const scalar_t plaintext, const scalar_t rho, scalar_t ciphertext);
 void paillier_encryption_decrypt            (const protocol_ctx_t *ctx, const paillier_private_key_t *priv, const scalar_t ciphertext, scalar_t plaintext);
 void paillier_encryption_homomorphic        (const protocol_ctx_t *ctx, const paillier_public_key_t *pub, const scalar_t ciphertext, const scalar_t factor, const scalar_t add_cipher, scalar_t new_cipher);
-void paillier_encryption_free_keys          (paillier_public_key_t *pub, paillier_private_key_t *priv);
 
 void ring_pedersen_params_from_paillier (const protocol_ctx_t *ctx, const paillier_public_key_t *pub, ring_pedersen_parameters_t *params);
 void ring_pedersen_commitment           (const protocol_ctx_t *ctx, const ring_pedersen_parameters_t *ring_params, const scalar_t alpha, const scalar_t beta, scalar_t ring_ped_com);
