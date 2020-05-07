@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "make and debug threshold tree playground",
+      "name": "make and debug nikmak ecdsa mpc poc",
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/udi/Fireblocks/Dev/nikmak_ecdsa_mpc_poc/benchmark",
