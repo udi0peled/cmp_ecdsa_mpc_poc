@@ -6,15 +6,23 @@ App_Link_Flags := -lcrypto
 
 all: $(Bench_Name)
 
-benchmark.o: benchmark.c nikmak_ecdsa_mpc_poc.o 
+benchmark.o: benchmark.c common.o tests.o primitives.o 
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-nikmak_ecdsa_mpc_poc.o: nikmak_ecdsa_mpc_poc.c nikmak_ecdsa_mpc_poc.h
+tests.o: tests.c tests.h common.o primitives.o 
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-$(Bench_Name): benchmark.o nikmak_ecdsa_mpc_poc.o 
+common.o: common.c common.h
+	@$(CC) $(App_C_Flags) -c $< -o $@
+	@echo "CC   <=  $<"
+
+primitives.o: primitives.c primitives.h
+	@$(CC) $(App_C_Flags) -c $< -o $@
+	@echo "CC   <=  $<"
+
+$(Bench_Name): benchmark.o primitives.o common.o tests.o
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 

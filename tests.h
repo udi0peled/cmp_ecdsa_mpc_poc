@@ -1,0 +1,16 @@
+#include "primitives.h"
+#include "common.h"
+
+#include <string.h>
+#include <assert.h>
+
+#ifndef __CMP20_ECDSA_MPC_TESTS_H__
+#define __CMP20_ECDSA_MPC_TESTS_H__
+
+void test_paillier_operations(const paillier_private_key_t *priv);
+void test_ring_pedersen(const scalar_t p, const scalar_t q);
+void test_fiat_shamir();
+void test_scalars(const scalar_t range, uint64_t range_byte_len);
+void test_group_elements();
+
+#endif

@@ -2,20 +2,19 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
-#ifndef __NIKMAK_ECDSA_MPC_POC_H__
-#define __NIKMAK_ECDSA_MPC_POC_H__
+#ifndef __CMP20_ECDSA_MPC_PRIMITIVES_H__
+#define __CMP20_ECDSA_MPC_PRIMITIVES_H__
 
 #define GROUP_ID NID_secp256k1
 #define GROUP_ORDER_BYTES 32
 #define GROUP_COMPRESSED_POINT_BYTES 33
 #define GROUP_UNCOMPRESSED_POINT_BYTES 65
-#define FIAT_SHAMIR_DIGEST_BYTES 32
-#define PAILLIER_FACTOR_BYTES (2 * GROUP_ORDER_BYTES)
-#define PAILLIER_FACTOR_BITS  (8 * PAILLIER_FACTOR_BYTES)
+#define PAILLIER_FACTOR_BYTES (2*GROUP_ORDER_BYTES)
+#define PAILLIER_MODULUS_BYTES (2*PAILLIER_FACTOR_BYTES)
 #define STATISTICAL_SECURITY 80
 
 
-typedef const EC_GROUP *ec_group_t;
+typedef EC_GROUP *ec_group_t;
 typedef EC_POINT *gr_elem_t;
 typedef BIGNUM *scalar_t;
 
@@ -23,17 +22,17 @@ typedef BIGNUM *scalar_t;
  *  Protocol Context
  */
 
-struct protocol_ctx 
-{
-  const EC_GROUP *ec;
-  BN_CTX *bn_ctx;
+// struct protocol_ctx 
+// {
+//   const EC_GROUP *ec;
+//   BN_CTX *bn_ctx;
 
-  //const BIGNUM *q;
-  //const EC_POINT *G;
-  gr_elem_t H;
+//   //const BIGNUM *q;
+//   //const EC_POINT *G;
+//   gr_elem_t H;
 
-  const char *sid;
-};
+//   const char *sid;
+// };
 
 
 /** 
@@ -301,7 +300,9 @@ typedef struct
     scalar_t B_x;
     scalar_t B_y;
     scalar_t E;
+    scalar_t S;
     scalar_t F;
+    scalar_t T;
     scalar_t z_1;
     scalar_t z_2;
     scalar_t z_3;
@@ -316,17 +317,25 @@ typedef struct
 // protocol_ctx_t *protocol_ctx_new ();
 // void            protocol_ctx_free(protocol_ctx_t *ctx);
 
-void fiat_shamir_hash(const uint8_t *data, const uint64_t data_len, uint8_t digest[FIAT_SHAMIR_DIGEST_BYTES]);
+void fiat_shamir_bytes(uint8_t *digest, uint64_t digest_len, const uint8_t *data, uint64_t data_len);
+void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const scalar_t range, const uint8_t *data, uint64_t data_len);
 
-scalar_t scalar_new();
-void scalar_free (scalar_t el);
-void sample_in_range(scalar_t rnd, const scalar_t range_mod, int coprime);
+scalar_t scalar_new   ();
+void scalar_free              (scalar_t num);
+void scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
+void scalar_mul               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
+void scalar_inv               (scalar_t result, const scalar_t num, const scalar_t modulus);
+void scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
+void scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, scalar_t num);
 
-ec_group_t  ec_group_get();
-gr_elem_t   group_elem_new ();
-void        group_elem_free(gr_elem_t el);
-void        group_multiplication     (const gr_elem_t a, const gr_elem_t b, gr_elem_t c);
-void        group_exponentiation     (const gr_elem_t a, const scalar_t exp, gr_elem_t c);
+ec_group_t  ec_group_new        ();
+void        ec_group_free       (ec_group_t ec);
+scalar_t    ec_group_order      (ec_group_t ec);
+
+gr_elem_t   group_elem_new      (const ec_group_t ec);
+void        group_elem_free     (gr_elem_t el);
+void        group_operation     (gr_elem_t result, const scalar_t g_exp, const gr_elem_t *bases, const scalar_t *exps, uint64_t num_bases, const ec_group_t ec);
+void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, ec_group_t ec);
 
 paillier_private_key_t *
       paillier_encryption_generate_key      ();
@@ -349,47 +358,45 @@ void  ring_pedersen_commit          (const ring_pedersen_public_t *rped_pub, con
 
 zkp_paillier_blum_modulus_t *
       zkp_paillier_blum_new    ();
-void  zkp_paillier_blum_free   (zkp_paillier_blum_modulus_t *proof);
-void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_t *proof, const zkp_aux_info_t *aux);
-int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *proof);
+void  zkp_paillier_blum_free   (zkp_paillier_blum_modulus_t *zkp);
+void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_ring_pedersen_param_t *
       zkp_ring_pedersen_param_new    ();
-void  zkp_ring_pedersen_param_free   (zkp_ring_pedersen_param_t *proof);
-void  zkp_ring_pedersen_param_prove  (zkp_ring_pedersen_param_t *proof, const zkp_aux_info_t *aux, const zkp_ring_pedersen_param_t *secret);
-int   zkp_ring_pedersen_param_verify (zkp_ring_pedersen_param_t *proof);
+void  zkp_ring_pedersen_param_free   (zkp_ring_pedersen_param_t *zkp);
+void  zkp_ring_pedersen_param_prove  (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_ring_pedersen_param_verify (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_schnorr_t *
       zkp_schnorr_new     ();
-void  zkp_schnorr_free    (zkp_schnorr_t *proof);
-void  zkp_schnorr_commit  (zkp_schnorr_t *proof, scalar_t alpha);
-void  zkp_schnorr_prove   (zkp_schnorr_t *proof, const zkp_aux_info_t *aux, const scalar_t x, const scalar_t alpha);      // alpha == NULL, sample random
-int   zkp_schnorr_verify  (zkp_schnorr_t *proof);
+void  zkp_schnorr_free    (zkp_schnorr_t *zkp);
+void  zkp_schnorr_commit  (zkp_schnorr_t *zkp, scalar_t alpha);
+void  zkp_schnorr_prove   (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux, const scalar_t alpha);      // alpha == NULL, sample random
+int   zkp_schnorr_verify  (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_encryption_in_range_t *
       zkp_encryption_in_range_new    ();
-void  zkp_encryption_in_range_free   (zkp_encryption_in_range_t *proof);
-void  zkp_encryption_in_range_prove  (zkp_encryption_in_range_t *proof, const zkp_aux_info_t *aux);
-int   zkp_encryption_in_range_verify (zkp_encryption_in_range_t *proof);
-
+void  zkp_encryption_in_range_free   (zkp_encryption_in_range_t *zkp);
+void  zkp_encryption_in_range_prove  (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_group_vs_paillier_range_t *
       zkp_group_vs_paillier_range_new    ();
-void  zkp_group_vs_paillier_range_free   (zkp_group_vs_paillier_range_t *proof);
-void  zkp_group_vs_paillier_range_prove  (zkp_group_vs_paillier_range_t *proof, const zkp_aux_info_t *aux);
-int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *proof);
-
+void  zkp_group_vs_paillier_range_free   (zkp_group_vs_paillier_range_t *zkp);
+void  zkp_group_vs_paillier_range_prove  (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_operation_group_commitment_range_t *
       zkp_operation_group_commitment_range_new    ();
-void  zkp_operation_group_commitment_range_prove  (zkp_operation_group_commitment_range_t *proof, const zkp_aux_info_t *aux);
-int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitment_range_t *proof);
-void  zkp_operation_group_commitment_range_free   (zkp_operation_group_commitment_range_t *proof);
+void  zkp_operation_group_commitment_range_free   (zkp_operation_group_commitment_range_t *zkp);
+void  zkp_operation_group_commitment_range_prove  (zkp_operation_group_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitment_range_t *zkp, const zkp_aux_info_t *aux);
 
 zkp_operation_paillier_commitment_range_t*
       zkp_operation_paillier_commitment_range_new    ();
-void  zkp_operation_paillier_commitment_range_free   (zkp_operation_paillier_commitment_range_t *proof);
-void  zkp_operation_paillier_commitment_range_prove  (zkp_operation_paillier_commitment_range_t *proof, const zkp_aux_info_t *aux);
-int   zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commitment_range_t *proof);
+void  zkp_operation_paillier_commitment_range_free   (zkp_operation_paillier_commitment_range_t *zkp);
+void  zkp_operation_paillier_commitment_range_prove  (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+int   zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
 
 #endif
