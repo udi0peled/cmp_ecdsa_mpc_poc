@@ -7,12 +7,13 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
 
   scalar_t alpha = scalar_new();
   scalar_t beta = scalar_new();
+  scalar_t gamma = scalar_new();
 
   scalar_sample_in_range(alpha, range, 0);
   scalar_sample_in_range(beta, range, 1);
 
   printBIGNUM("range = ", range, " ");
-  printf("#(%d bytes, expected %lu)\n", BN_num_bytes(range), range_byte_len);
+  printf("#(%d bytes, should be %lu)\n", BN_num_bytes(range), range_byte_len);
 
   printBIGNUM("alpha = ", alpha, " ");
   printf("#(%d bytes)\n", BN_num_bytes(alpha));
@@ -24,7 +25,27 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
   scalar_to_bytes(alpha_bytes, range_byte_len, alpha);
   printHexBytes("alpha_bytes = 0x", alpha_bytes, range_byte_len, "\n");
 
+  scalar_make_plus_minus(alpha, range);
+  printBIGNUM("alpha_s = ", alpha, "\n");
+  
+  scalar_exp(gamma, beta, alpha, range);
+  printBIGNUM("# beta ** alpha_s (mod range) = ", gamma, "\n");
+
+  scalar_add(gamma, beta, alpha, range);
+  printBIGNUM("# ", gamma, " ==\n");
+  printf("(beta + alpha_s) %% range\n");
+
+  scalar_mul(gamma, beta, alpha, range);
+  printBIGNUM("# ", gamma, "  ==\n");
+  printf("(beta * alpha_s) %% range\n");
+
+  scalar_inv(gamma, alpha, range);
+  printBIGNUM("# ", gamma, " ==\n");
+  printf("mod_inverse(alpha_s,range)\n");
+
+
   free(alpha_bytes);
+  scalar_free(gamma);
   scalar_free(alpha);
   scalar_free(beta);
 }
@@ -51,7 +72,7 @@ void test_group_elements()
   el[2] = group_elem_new(ec);
   printf("el = [0, 1, 2]\n");
 
-  uint8_t el_bytes[GROUP_COMPRESSED_POINT_BYTES];
+  uint8_t el_bytes[GROUP_ELEMENT_BYTES];
   
   group_operation(el[0], exps[0], NULL, NULL, 0, ec);
   EC_POINT_point2oct(ec, el[0], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
@@ -98,21 +119,21 @@ void test_paillier_operations(const paillier_private_key_t *priv)
   scalar_sample_in_range(plaintext, pub->N , 0);
   printBIGNUM("plaintext = ", plaintext, "\n");
 
-  paillier_encryption_sample(pub, randomness);
+  paillier_encryption_sample(randomness, pub);
   printBIGNUM("randomness = ", (randomness), "\n");
 
-  paillier_encryption_encrypt(pub, plaintext, randomness, ciphertext);
+  paillier_encryption_encrypt(ciphertext, plaintext, randomness, pub);
   printBIGNUM("ciphertext = ", (ciphertext), "\n");
 
-  paillier_encryption_decrypt(priv, ciphertext, decrypted);
+  paillier_encryption_decrypt(decrypted, ciphertext, priv);
   printBIGNUM("decrypted = ", (decrypted), "\n");
 
   assert(BN_cmp(plaintext, decrypted) == 0);
 
-  paillier_encryption_homomorphic(pub, ciphertext, plaintext, ciphertext, ciphertext);
+  paillier_encryption_homomorphic(ciphertext, ciphertext, plaintext, ciphertext, pub);
   printBIGNUM("ciphertext = ", (ciphertext), "\n");
 
-  paillier_encryption_decrypt(priv, ciphertext, decrypted);
+  paillier_encryption_decrypt(decrypted, ciphertext, priv);
   printBIGNUM("decrypted = ", (decrypted), "\n");
 
   BN_mod_mul(randomness, plaintext, plaintext, pub->N, bn_ctx);
@@ -148,12 +169,13 @@ void test_ring_pedersen(const scalar_t p, const scalar_t q)
   scalar_t rped_com = scalar_new();
   
   scalar_sample_in_range(s_exp, rped_pub->N, 0);
+  // scalar_make_plus_minus(s_exp, rped_pub->N);
   printBIGNUM("s_exp = ", (s_exp), "\n");
 
   scalar_sample_in_range(t_exp, rped_pub->N, 0);
   printBIGNUM("t_exp = ", (t_exp), "\n");
 
-  ring_pedersen_commit(rped_pub, s_exp, t_exp, rped_com);
+  ring_pedersen_commit(rped_com, s_exp, t_exp, rped_pub);
   printBIGNUM("rped_com = ", (rped_com), "\n");
 
   ring_pedersen_free_param(rped_priv, rped_pub);
@@ -213,4 +235,22 @@ void test_fiat_shamir(uint64_t digest_len, uint64_t data_len)
   free(data);
   free(digest);
   BN_CTX_free(bn_ctx);
+}
+
+void test_zkp_schnorr()
+{
+  zkp_schnorr_t *zkp = zkp_schnorr_new();
+  zkp_aux_info_t aux;
+  aux.info = NULL;
+  aux.info_len = 0;
+  
+  zkp->public.G = ec_group_new();
+  zkp->public.g = (gr_elem_t) EC_GROUP_get0_generator(zkp->public.G);
+
+  zkp->secret.x = scalar_new();
+  scalar_sample_in_range(zkp->secret.x, ec_group_order(zkp->public.G), 0);
+  
+  group_operation(zkp->public.X, 0, &zkp->public.g, &zkp->secret.x, 1, zkp->public.G);
+
+  zkp_schnorr_prove(zkp, &aux, NULL);
 }

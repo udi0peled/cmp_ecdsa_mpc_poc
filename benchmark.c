@@ -83,7 +83,7 @@ void time_paillier_encrypt(uint64_t reps, paillier_public_key_t *pub, unsigned l
   {
     BN_add_word(plaintext, 1);
     BN_add_word(randomness, 1);
-    paillier_encryption_encrypt(pub, plaintext, randomness, ciphertext);
+    paillier_encryption_encrypt(ciphertext, plaintext, randomness, pub);
   }
 
   //printf("plain = %s\nrandom = %s\ncipher = ", (plaintext), BN_bn2dec(randomness), BN_bn2dec(ciphertext), "\n");
@@ -94,6 +94,68 @@ void time_paillier_encrypt(uint64_t reps, paillier_public_key_t *pub, unsigned l
   scalar_free(plaintext);
   scalar_free(ciphertext);
   scalar_free(randomness);
+}
+
+void time_bn_ctx(uint64_t reps)
+{
+  ec_group_t ec = ec_group_new();
+  gr_elem_t el = group_elem_new(ec);
+  //uint8_t el_bytes[GROUP_ELEMENT_BYTES];
+
+  scalar_t a[10];
+  for (uint64_t i = 0; i < 5; ++i)
+  {
+    a[i] = scalar_new();
+    a[i+5] = scalar_new();
+    scalar_sample_in_range(a[i], ec_group_order(ec), 0);
+    BN_copy(a[i+5], a[i]);
+  }
+
+  BN_CTX **bn_ctx_arr = calloc(reps, sizeof(BN_CTX*));
+
+  printf("# timing bn_ctx_secure_new + operation, each fresh\n");
+  printBIGNUM("secp256k1.G * ", a[0], "\n");
+
+  start = clock();
+
+  for (uint64_t i = 0; i < reps; ++i)
+  {
+    bn_ctx_arr[i] = BN_CTX_secure_new();
+    EC_POINT_mul(ec, el, a[0], NULL, NULL, bn_ctx_arr[i]);
+    scalar_add(a[0], a[0], a[1], ec_group_order(ec));
+    // group_elem_to_bytes(el_bytes, sizeof(el_bytes), el, ec);
+    // printHexBytes("# el = ", el_bytes, sizeof(el_bytes), "\n");
+  }
+
+  diff = clock() - start;
+
+  printf("# %lu repetitions, time: %lu msec, avg: %f msec\n", reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
+
+  for (uint64_t i = 0; i < reps; ++i) BN_CTX_free(bn_ctx_arr[i]);
+  free(bn_ctx_arr);
+  
+  printf("# timing single bn_ctx_secure_new + (operation repeating) \n");
+
+  BN_copy(a[0], a[5]);
+
+  start = clock();
+
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  for (uint64_t i = 0; i < reps; ++i)
+  {
+    EC_POINT_mul(ec, el, a[0], NULL, NULL, bn_ctx);
+    scalar_add(a[0], a[0], a[1], ec_group_order(ec));
+    // group_elem_to_bytes(el_bytes, sizeof(el_bytes), el, ec);
+    // printHexBytes("# el = ", el_bytes, sizeof(el_bytes), "\n");
+
+  }
+  BN_CTX_free(bn_ctx);
+  diff = clock() - start;
+  
+  printf("# %lu repetitions, time: %lu msec, avg: %f msec\n", reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
+  for (uint64_t i = 0; i < 10; ++i) scalar_free(a[i]);
+  group_elem_free(el);
+  ec_group_free(ec);
 }
 
 int main()
@@ -122,11 +184,13 @@ int main()
 
   test_fiat_shamir(100, 100);
 
-  test_scalars(priv->p, PAILLIER_FACTOR_BYTES);
+  test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
   test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
   test_scalars(priv->pub.N2, 2*PAILLIER_MODULUS_BYTES);
 
   paillier_encryption_free_keys(priv, NULL);
 
   test_group_elements();
+
+  time_bn_ctx(1000);
 }
