@@ -4,7 +4,7 @@ zkp_group_vs_paillier_range_t *zkp_group_vs_paillier_range_new()
 {
   zkp_group_vs_paillier_range_t *zkp = malloc(sizeof(*zkp));
 
-  zkp->proof.Y   = group_elem_new(zkp->public.G);
+  zkp->proof.Y   = NULL;            // Group elements are created when proving
   zkp->proof.A   = scalar_new();
   zkp->proof.D   = scalar_new();
   zkp->proof.S   = scalar_new();
@@ -17,7 +17,7 @@ zkp_group_vs_paillier_range_t *zkp_group_vs_paillier_range_new()
 
 void  zkp_group_vs_paillier_range_free   (zkp_group_vs_paillier_range_t *zkp)
 {
-  group_elem_free(zkp->proof.Y);
+  if (zkp->proof.Y) group_elem_free(zkp->proof.Y);
   scalar_free(zkp->proof.A);
   scalar_free(zkp->proof.D);
   scalar_free(zkp->proof.S);
@@ -63,6 +63,8 @@ void zkp_group_vs_paillier_range_challenge (scalar_t e, zkp_group_vs_paillier_ra
 
 void zkp_group_vs_paillier_range_prove (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux)
 {
+  if (!zkp->proof.Y) zkp->proof.Y = group_elem_new(zkp->public.G);
+  
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
   scalar_t alpha_range = scalar_new();
@@ -88,7 +90,7 @@ void zkp_group_vs_paillier_range_prove (zkp_group_vs_paillier_range_t *zkp, cons
   scalar_sample_in_range(mu, mu_range, 0);
   scalar_make_plus_minus(mu, mu_range);
 
-  group_operation(zkp->proof.Y, NULL, &zkp->public.g, &zkp->secret.x, 1, zkp->public.G);
+  group_operation(zkp->proof.Y, NULL, zkp->public.g, zkp->secret.x, zkp->public.G);
 
   paillier_encryption_sample(r, zkp->public.paillier_pub);  
   paillier_encryption_encrypt(zkp->proof.A, alpha, r, zkp->public.paillier_pub);
@@ -120,6 +122,8 @@ void zkp_group_vs_paillier_range_prove (zkp_group_vs_paillier_range_t *zkp, cons
 
 int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux)
 {
+  if (!zkp->proof.Y) zkp->proof.Y = group_elem_new(zkp->public.G);
+
   scalar_t z_1_range = scalar_new();
   BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);     // -1 since comparing signed range
 
@@ -143,16 +147,9 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
 
   gr_elem_t lhs_gr_elem = group_elem_new(zkp->public.G);
   gr_elem_t rhs_gr_elem = group_elem_new(zkp->public.G);
-  gr_elem_t rhs_temp_gr_elem[2];
-  scalar_t  rhs_temp_scalars[2];
 
-  rhs_temp_gr_elem[0] = zkp->proof.Y;
-  rhs_temp_scalars[0] = (scalar_t) BN_value_one();
-  rhs_temp_gr_elem[1] = zkp->public.X;
-  rhs_temp_scalars[1] = e;
-
-  group_operation(lhs_gr_elem, NULL, &zkp->public.g, &zkp->proof.z_1, 1, zkp->public.G);
-  group_operation(rhs_gr_elem, NULL, rhs_temp_gr_elem, rhs_temp_scalars, 2, zkp->public.G);
+  group_operation(lhs_gr_elem, NULL, zkp->public.g, zkp->proof.z_1, zkp->public.G);
+  group_operation(rhs_gr_elem, zkp->proof.Y, zkp->public.X, e, zkp->public.G);
   is_verified &= group_elem_equal(lhs_gr_elem, rhs_gr_elem, zkp->public.G);
 
   scalar_free(e);

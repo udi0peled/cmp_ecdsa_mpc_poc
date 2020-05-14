@@ -53,7 +53,7 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
 void test_group_elements()
 {
   printf("# test_group_elements\n");
-  printf("import secp2561k1\n");
+  printf("import secp256k1\n");
 
   ec_group_t ec = ec_group_new();
   BN_CTX *bn_ctx = BN_CTX_secure_new();
@@ -74,25 +74,25 @@ void test_group_elements()
 
   uint8_t el_bytes[GROUP_ELEMENT_BYTES];
   
-  group_operation(el[0], exps[0], NULL, NULL, 0, ec);
+  group_operation(el[0], NULL, (const gr_elem_t) EC_GROUP_get0_generator(ec), exps[0], ec);
   EC_POINT_point2oct(ec, el[0], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
   printHexBytes("# el[0] = ", el_bytes, sizeof(el_bytes), "\n");
   printf("el[0] = secp256k1.G * exps[0]\n");
 
-  group_operation(el[1], exps[1], NULL, NULL, 0, ec);  
+  group_operation(el[1], NULL, (const gr_elem_t) EC_GROUP_get0_generator(ec), exps[1], ec);  
   EC_POINT_point2oct(ec, el[1], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
   printHexBytes("# el[1] = ", el_bytes, sizeof(el_bytes), "\n");
   printf("el[1] = secp256k1.G * exps[1]\n");
   
-  group_operation(el[2], 0, el, NULL, 2, ec);
+  group_operation(el[2], el[0], el[1],(const scalar_t) BN_value_one(), ec);
   EC_POINT_point2oct(ec, el[2], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
   printHexBytes("# results = ", el_bytes, sizeof(el_bytes), "\n");
   printf("el[0] + el[1]\n");
 
-  group_operation(el[2], (const scalar_t) BN_value_one(), el, exps, 2, ec);
+  group_operation(el[2], el[0], el[1], exps[0], ec);
   EC_POINT_point2oct(ec, el[2], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
-  printHexBytes("# result = ", el_bytes, sizeof(el_bytes), "\n");
-  printf("secp256k1.G + el[0]*exps[0] + el[1]*exps[1]\n");
+  printHexBytes("# results = ", el_bytes, sizeof(el_bytes), "\n");
+  printf("el[0] + el[1]**exps[0]\n");
 
   scalar_free(exps[0]);
   scalar_free(exps[1]);
@@ -239,18 +239,110 @@ void test_fiat_shamir(uint64_t digest_len, uint64_t data_len)
 
 void test_zkp_schnorr()
 {
-  zkp_schnorr_t *zkp = zkp_schnorr_new();
+  printf("# test_zkp_schnorr\n");
+  
   zkp_aux_info_t aux;
   aux.info = NULL;
   aux.info_len = 0;
+
+  zkp_schnorr_t *zkp = zkp_schnorr_new();
   
   zkp->public.G = ec_group_new();
   zkp->public.g = (gr_elem_t) EC_GROUP_get0_generator(zkp->public.G);
+  zkp->public.X = group_elem_new(zkp->public.G);
 
   zkp->secret.x = scalar_new();
   scalar_sample_in_range(zkp->secret.x, ec_group_order(zkp->public.G), 0);
-  
-  group_operation(zkp->public.X, 0, &zkp->public.g, &zkp->secret.x, 1, zkp->public.G);
 
-  zkp_schnorr_prove(zkp, &aux, NULL);
+  group_operation(zkp->public.X, NULL, zkp->public.g, zkp->secret.x, zkp->public.G);
+
+  scalar_t alpha = scalar_new();
+
+  zkp_schnorr_commit(zkp, alpha);
+  zkp_schnorr_prove(zkp, &aux, alpha);
+  printf("# valid (1) => %d\n", zkp_schnorr_verify(zkp, &aux));
+
+  BN_add_word(alpha,1);
+  zkp_schnorr_prove(zkp, &aux, alpha);
+  printf("# incremented alpha (1) => %d\n", zkp_schnorr_verify(zkp, &aux));
+
+  BN_add_word(zkp->secret.x,1);
+  zkp_schnorr_prove(zkp, &aux, alpha);
+  printf("# wrond secret (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+
+  BN_sub_word(zkp->secret.x,1);
+  BN_add_word(zkp->proof.z, 1);
+  printf("# wrong z (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+
+  aux.info = malloc(1);
+  aux.info_len = 1;
+  printf("# wrong aux (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  
+  free(aux.info);
+  scalar_free(alpha);
+  scalar_free(zkp->secret.x);
+  group_elem_free(zkp->public.X);
+  ec_group_free(zkp->public.G);
+  zkp_schnorr_free(zkp);
+}
+
+void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub)
+{
+  printf("# test encryption_in_range\n");
+  zkp_aux_info_t aux;
+  aux.info = NULL;
+  aux.info_len = 0;
+
+  zkp_encryption_in_range_t *zkp = zkp_encryption_in_range_new();
+
+  zkp->public.G = ec_group_new();
+  zkp->public.paillier_pub = paillier_pub;
+  zkp->public.rped_pub = rped_pub;
+  zkp->public.K = scalar_new();
+
+  zkp->secret.k = scalar_new();
+  zkp->secret.rho = scalar_new();
+
+  scalar_t G_order = ec_group_order(zkp->public.G);
+
+  scalar_sample_in_range(zkp->secret.k, G_order, 0);
+  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
+  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
+
+  printBIGNUM("k = ", zkp->secret.k, "\n");
+  printBIGNUM("rho = ", zkp->secret.rho, "\n");
+  printBIGNUM("K = ", zkp->public.K, "\n");
+
+  zkp_encryption_in_range_prove(zkp, &aux);
+  printf("# valid (1) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+
+  BN_add_word(zkp->secret.k, 1);
+  zkp_encryption_in_range_prove(zkp, &aux);
+  printf("# wrong secret (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+
+  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
+  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
+  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
+  zkp_encryption_in_range_prove(zkp, &aux);
+  printf("# secret in slack (1) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+
+  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
+  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
+  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
+  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
+  zkp_encryption_in_range_prove(zkp, &aux);
+  printf("# too big secret (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+
+  
+
+  aux.info = malloc(1);
+  aux.info_len = 1;
+  printf("# wrong aux (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+  
+  free(aux.info);
+  scalar_free(zkp->secret.k);
+  scalar_free(zkp->secret.rho);
+  scalar_free(zkp->public.K);
+  ec_group_free(zkp->public.G);
+  zkp_encryption_in_range_free(zkp);
 }

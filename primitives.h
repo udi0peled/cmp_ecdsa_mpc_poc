@@ -1,3 +1,5 @@
+#include "paillier_cryptosystem.h"
+#include "ring_pedersen_parameters.h"
 #include "zkp_common.h"
 #include "zkp_ring_pedersen_param.h"
 #include "zkp_paillier_blum_modulus.h"

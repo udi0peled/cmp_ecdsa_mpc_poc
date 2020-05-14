@@ -20,7 +20,7 @@ ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const 
 
   scalar_sample_in_range(priv->lam, priv->phi_N, 0);
 
-  BIGNUM *r = scalar_new();
+  scalar_t r = scalar_new();
   scalar_sample_in_range(r, priv->pub.N, 1);
   BN_mod_mul(priv->pub.t, r, r, priv->pub.N, bn_ctx);
   BN_mod_exp(priv->pub.s, priv->pub.t, priv->lam, priv->pub.N, bn_ctx);
@@ -73,7 +73,9 @@ void  ring_pedersen_commit(scalar_t rped_commitment, const scalar_t s_exp, const
   scalar_t res_rped_commitment = scalar_new();
 
   BN_mod_exp(first_factor, rped_pub->s, s_exp, rped_pub->N, bn_ctx);
+  if (BN_is_negative(s_exp)) BN_mod_inverse(first_factor, first_factor, rped_pub->N, bn_ctx);
   BN_mod_exp(res_rped_commitment, rped_pub->t, t_exp, rped_pub->N, bn_ctx);
+  if (BN_is_negative(t_exp)) BN_mod_inverse(res_rped_commitment, res_rped_commitment, rped_pub->N, bn_ctx);
   BN_mod_mul(res_rped_commitment, first_factor, res_rped_commitment, rped_pub->N, bn_ctx);
 
   BN_copy(rped_commitment, res_rped_commitment);

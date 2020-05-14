@@ -108,11 +108,14 @@ void paillier_encryption_homomorphic (scalar_t new_cipher, const scalar_t cipher
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   BIGNUM *res_new_cipher = BN_dup(ciphertext);
 
-  if (factor) {
+  if (factor)
+  {
     BN_mod_exp(res_new_cipher, res_new_cipher, factor, pub->N2, bn_ctx);
+    if (BN_is_negative(factor)) BN_mod_inverse(res_new_cipher, res_new_cipher, pub->N2, bn_ctx);
   }
   
-  if (add_cipher){
+  if (add_cipher)
+  {
     BN_mod_mul(res_new_cipher, res_new_cipher, add_cipher, pub->N2, bn_ctx);
   }
 

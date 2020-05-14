@@ -33,7 +33,7 @@ scalar_t    ec_group_order      (ec_group_t ec);
 gr_elem_t   group_elem_new      (const ec_group_t ec);
 void        group_elem_free     (gr_elem_t el);
 void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec);
-void        group_operation     (gr_elem_t result, const scalar_t g_exp, const gr_elem_t *bases, const scalar_t *exps, uint64_t num_bases, const ec_group_t ec);
+void        group_operation     (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 int         group_elem_equal    (const gr_elem_t a, const gr_elem_t b, const ec_group_t ec);
 
 #endif

@@ -4,7 +4,7 @@ zkp_operation_group_commitment_range_t *zkp_operation_group_commitment_range_new
 {
   zkp_operation_group_commitment_range_t *zkp = malloc(sizeof(*zkp));
 
-  zkp->proof.B_x  = group_elem_new(zkp->public.G);
+  zkp->proof.B_x  = NULL;           // Group elements are created when proving
   zkp->proof.B_y  = scalar_new();
   zkp->proof.A    = scalar_new();
   zkp->proof.E    = scalar_new();
@@ -23,7 +23,7 @@ zkp_operation_group_commitment_range_t *zkp_operation_group_commitment_range_new
 
 void  zkp_operation_group_commitment_range_free   (zkp_operation_group_commitment_range_t *zkp)
 {
-  group_elem_free(zkp->proof.B_x);
+  if (zkp->proof.B_x) group_elem_free(zkp->proof.B_x);
   scalar_free(zkp->proof.B_y);
   scalar_free(zkp->proof.A);
   scalar_free(zkp->proof.E);
@@ -81,6 +81,8 @@ void zkp_operation_group_commitment_range_challenge (scalar_t e, zkp_operation_g
 
 void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_range_t *zkp, const zkp_aux_info_t *aux)
 {
+  if (!zkp->proof.B_x) zkp->proof.B_x = group_elem_new(zkp->public.G);
+
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
   scalar_t alpha_range = scalar_new();
@@ -120,7 +122,7 @@ void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_
   scalar_sample_in_range(m, mu_range, 0);
   scalar_make_plus_minus(m, mu_range);
   
-  group_operation(zkp->proof.B_x, NULL, &zkp->public.g, &alpha, 1, zkp->public.G);
+  group_operation(zkp->proof.B_x, NULL, zkp->public.g, alpha, zkp->public.G);
 
   paillier_encryption_sample(r_y, zkp->public.paillier_pub_1);
   paillier_encryption_encrypt(zkp->proof.B_y, beta, r_y, zkp->public.paillier_pub_1);
@@ -213,16 +215,9 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
 
   gr_elem_t lhs_gr_elem = group_elem_new(zkp->public.G);
   gr_elem_t rhs_gr_elem = group_elem_new(zkp->public.G);
-  gr_elem_t rhs_temp_gr_elem[2];
-  scalar_t  rhs_temp_scalars[2];
 
-  rhs_temp_gr_elem[0] = zkp->proof.B_x;
-  rhs_temp_scalars[0] = (scalar_t) BN_value_one();
-  rhs_temp_gr_elem[1] = zkp->public.X;
-  rhs_temp_scalars[1] = e;
-
-  group_operation(lhs_gr_elem, NULL, &zkp->public.g, &zkp->proof.z_1, 1, zkp->public.G);
-  group_operation(rhs_gr_elem, NULL, rhs_temp_gr_elem, rhs_temp_scalars, 2, zkp->public.G);
+  group_operation(lhs_gr_elem, NULL, zkp->public.g, zkp->proof.z_1, zkp->public.G);
+  group_operation(rhs_gr_elem, zkp->proof.B_x, zkp->public.X, e, zkp->public.G);
   is_verified &= group_elem_equal(lhs_gr_elem, rhs_gr_elem, zkp->public.G);
 
   scalar_free(e);

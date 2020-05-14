@@ -4,7 +4,7 @@ zkp_schnorr_t *zkp_schnorr_new()
 {
   zkp_schnorr_t *zkp = malloc(sizeof(*zkp));
   
-  zkp->proof.A = group_elem_new(zkp->public.G);
+  zkp->proof.A = NULL;            // Group elements are created when proving
   zkp->proof.z = scalar_new();
 
   return zkp;
@@ -12,15 +12,17 @@ zkp_schnorr_t *zkp_schnorr_new()
 
 void zkp_schnorr_free (zkp_schnorr_t *zkp)
 {
-  group_elem_free(zkp->proof.A);
+  if (zkp->proof.A) group_elem_free(zkp->proof.A);
   scalar_free(zkp->proof.z);
   free(zkp);
 }
 
 void zkp_schnorr_commit (zkp_schnorr_t *zkp, scalar_t alpha)
 {
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);
+
   scalar_sample_in_range(alpha, ec_group_order(zkp->public.G), 0);
-  group_operation(zkp->proof.A, NULL, &zkp->public.g, &alpha, 1, zkp->public.G);
+  group_operation(zkp->proof.A, NULL, zkp->public.g, alpha, zkp->public.G);
 }
 
 void zkp_schnoor_challenge(scalar_t e, const zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
@@ -46,6 +48,7 @@ void zkp_schnorr_prove (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux, const sca
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   scalar_t e = scalar_new();
 
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);
   EC_POINT_mul(zkp->public.G, zkp->proof.A, NULL, zkp->public.g, alpha, bn_ctx);
 
   zkp_schnoor_challenge(e, zkp, aux);
@@ -59,24 +62,16 @@ void zkp_schnorr_prove (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux, const sca
 
 int zkp_schnorr_verify (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
 {
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);
+  
   scalar_t e = scalar_new();
   zkp_schnoor_challenge(e, zkp, aux);
-
-  gr_elem_t temp_gr_elem[2];
-  scalar_t  temp_scalars[2];
 
   gr_elem_t lhs_value = group_elem_new(zkp->public.G);
   gr_elem_t rhs_value = group_elem_new(zkp->public.G);
 
-  group_operation(lhs_value, NULL, &zkp->public.g, &zkp->proof.z, 1, zkp->public.G);
-
-  temp_gr_elem[0] = zkp->proof.A;
-  temp_gr_elem[1] = zkp->public.X;
-  temp_scalars[0] = (scalar_t) BN_value_one();
-  temp_scalars[1] = e;
-
-  group_operation(rhs_value, NULL, temp_gr_elem, temp_scalars, 2, zkp->public.G);
-
+  group_operation(lhs_value, NULL, zkp->public.g, zkp->proof.z, zkp->public.G);
+  group_operation(rhs_value, zkp->proof.A, zkp->public.X, e, zkp->public.G);
   int is_verified = group_elem_equal(lhs_value, rhs_value, zkp->public.G);
 
   scalar_free(e);

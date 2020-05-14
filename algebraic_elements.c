@@ -36,14 +36,10 @@ void scalar_exp (scalar_t result, const scalar_t base, const scalar_t exp, const
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   
   scalar_t res = scalar_new();
-  //scalar_t pos_exp = BN_dup(exp);
-
-  int invert = BN_is_negative(exp);
   
   // if exp negative, it ignores and uses positive
   BN_mod_exp(res, base, exp, modulus, bn_ctx);
-  
-  if (invert) BN_mod_inverse(res, res, modulus, bn_ctx);
+  if (BN_is_negative(exp)) BN_mod_inverse(res, res, modulus, bn_ctx);
 
   BN_copy(result, res);
   scalar_free(res);
@@ -95,9 +91,9 @@ void sample_safe_prime(scalar_t prime, unsigned int bits)
  *  Group and Group Elements
  */
 
-ec_group_t  ec_group_new ()                     { return EC_GROUP_new_by_curve_name(GROUP_ID); }
-void        ec_group_free (ec_group_t ec)       { EC_GROUP_free(ec); }
-scalar_t    ec_group_order      (ec_group_t ec) { return (scalar_t) EC_GROUP_get0_order(ec); }
+ec_group_t  ec_group_new    ()                    { return EC_GROUP_new_by_curve_name(GROUP_ID); }
+void        ec_group_free   (ec_group_t ec)       { EC_GROUP_free(ec); }
+scalar_t    ec_group_order  (ec_group_t ec)       { return (scalar_t) EC_GROUP_get0_order(ec); }
 
 gr_elem_t   group_elem_new (const ec_group_t ec)  { return EC_POINT_new(ec); }
 void        group_elem_free (gr_elem_t el)        { EC_POINT_clear_free(el); }
@@ -114,22 +110,22 @@ void group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const
  *  num_bases can be 0, and bases == exps NULL.
  *  if num_bases > 0, and exp == NULL, set ones (bases must of length num_bases).
  */
-void group_operation (gr_elem_t result, const scalar_t g_exp, const gr_elem_t *bases, const scalar_t *exps, uint64_t num_bases, const ec_group_t ec)
+void group_operation (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
-  int free_use_exps = 0;
-  scalar_t *use_exps = (scalar_t *) exps;
-  // If exps is null, set all to 1
-  if (!use_exps)
+  if (initial)
   {
-    use_exps = calloc(num_bases, sizeof(scalar_t));
-    free_use_exps = 1;
-    for (uint64_t i = 0; i < num_bases; ++i) use_exps[i] = (scalar_t) BN_value_one();
+    gr_elem_t temp_res = group_elem_new(ec);
+    EC_POINT_mul(ec, temp_res, NULL, base, exp, bn_ctx);
+    EC_POINT_add(ec, result, initial, temp_res, bn_ctx);
+    group_elem_free(temp_res);
   }
-  EC_POINTs_mul(ec, result, g_exp, num_bases, (const EC_POINT **) bases, (const BIGNUM **) use_exps, bn_ctx);
-
-  if (free_use_exps) free(use_exps);
+  else
+  {
+    EC_POINT_mul(ec, result, NULL, base, exp, bn_ctx);
+  }
+  
   BN_CTX_free(bn_ctx);
 }
 

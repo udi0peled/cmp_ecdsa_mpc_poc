@@ -184,13 +184,18 @@ int main()
 
   test_fiat_shamir(100, 100);
 
-  test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
-  test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
+  //test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
+  //test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
   test_scalars(priv->pub.N2, 2*PAILLIER_MODULUS_BYTES);
 
+  //test_group_elements();
+
+  //time_bn_ctx(1000);
+
+  ring_pedersen_private_t *rped_priv = ring_pedersen_generate_param(priv->p, priv->q);
+  test_zkp_schnorr();
+
+  test_zkp_encryption_in_range(&priv->pub, &rped_priv->pub);
+
   paillier_encryption_free_keys(priv, NULL);
-
-  test_group_elements();
-
-  time_bn_ctx(1000);
 }

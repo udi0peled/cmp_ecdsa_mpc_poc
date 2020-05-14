@@ -131,7 +131,7 @@ int zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_au
   scalar_exp(rhs_value, zkp->proof.S, e, zkp->public.rped_pub->N);
   scalar_mul(rhs_value, zkp->proof.C, rhs_value, zkp->public.rped_pub->N);
   is_verified &= scalar_equal(lhs_value, rhs_value);
-
+  
   scalar_free(e);
   scalar_free(lhs_value);
   scalar_free(rhs_value);
