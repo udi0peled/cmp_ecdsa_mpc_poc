@@ -169,7 +169,7 @@ int main()
   printf("# paillier key\n");
   printBIGNUM("p = ", (priv->p), "\n");
   printBIGNUM("q = ", (priv->q), "\n");
-  printBIGNUM("paillier_lambda = ", (priv->lambda), "\n");
+  printBIGNUM("paillier_phi_N = ", (priv->phi_N), "\n");
   printBIGNUM("nmu = ", (priv->mu), "\n");
   printBIGNUM("N = ", (priv->pub.N), "\n");
   printBIGNUM("N2 = ", (priv->pub.N2), "\n");

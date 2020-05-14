@@ -160,7 +160,7 @@ void test_ring_pedersen(const scalar_t p, const scalar_t q)
   printBIGNUM("N = ", (rped_pub->N), "\n");
   printBIGNUM("s = ", (rped_pub->s), "\n");
   printBIGNUM("t = ", (rped_pub->t), "\n");
-  printBIGNUM("ped_lambda = ", (rped_priv->lambda), "\n");
+  printBIGNUM("ped_lam = ", (rped_priv->lam), "\n");
   printBIGNUM("phi_N = ", (rped_priv->phi_N), "\n");
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();

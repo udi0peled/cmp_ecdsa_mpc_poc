@@ -16,9 +16,7 @@ typedef struct
 {
   ring_pedersen_public_t *rped_pub;
 
-  struct {
-    scalar_t lambda;
-  } secret;
+  ring_pedersen_private_t *secret;
 
   struct {
     scalar_t A[STATISTICAL_SECURITY];

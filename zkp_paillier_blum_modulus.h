@@ -13,12 +13,9 @@
 
 typedef struct
 {
-  paillier_public_key_t *paillier_pub;
+  paillier_public_key_t *public;
 
-  struct {
-    scalar_t p;
-    scalar_t q;
-  } secret;
+  paillier_private_key_t * private;
 
   struct {
     scalar_t w;

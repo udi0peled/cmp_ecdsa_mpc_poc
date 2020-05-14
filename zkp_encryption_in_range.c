@@ -112,7 +112,7 @@ void zkp_encryption_in_range_prove (zkp_encryption_in_range_t *zkp, const zkp_au
 int zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux)
 {
   scalar_t z_1_range = scalar_new();
-  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
+  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);     // -1 since comparing signed range
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0);
 
@@ -125,7 +125,7 @@ int zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_au
   paillier_encryption_encrypt(lhs_value, zkp->proof.z_1, zkp->proof.z_2, zkp->public.paillier_pub);
   scalar_exp(rhs_value, zkp->public.K, e, zkp->public.paillier_pub->N2);
   scalar_mul(rhs_value, zkp->proof.A, rhs_value, zkp->public.paillier_pub->N2);
-  is_verified = scalar_equal(lhs_value, rhs_value);
+  is_verified &= scalar_equal(lhs_value, rhs_value);
 
   ring_pedersen_commit(lhs_value, zkp->proof.z_1, zkp->proof.z_3, zkp->public.rped_pub);  
   scalar_exp(rhs_value, zkp->proof.S, e, zkp->public.rped_pub->N);

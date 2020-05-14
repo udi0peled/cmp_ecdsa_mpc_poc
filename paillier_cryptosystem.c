@@ -9,7 +9,7 @@ paillier_private_key_t *paillier_encryption_generate_key ()
   priv->p       = scalar_new();
   priv->q       = scalar_new();
   priv->mu      = scalar_new();
-  priv->lambda  = scalar_new();
+  priv->phi_N  = scalar_new();
   priv->pub.N   = scalar_new();
   priv->pub.N2  = scalar_new();
 
@@ -19,11 +19,11 @@ paillier_private_key_t *paillier_encryption_generate_key ()
   BN_mul(priv->pub.N, priv->p, priv->q, bn_ctx);
   BN_sqr(priv->pub.N2, priv->pub.N, bn_ctx);
 
-  BN_sub(priv->lambda, priv->pub.N, priv->p);
-  BN_sub(priv->lambda, priv->lambda, priv->q);
-  BN_add_word(priv->lambda, 1);
+  BN_sub(priv->phi_N, priv->pub.N, priv->p);
+  BN_sub(priv->phi_N, priv->phi_N, priv->q);
+  BN_add_word(priv->phi_N, 1);
 
-  BN_mod_inverse(priv->mu, priv->lambda, priv->pub.N, bn_ctx);
+  BN_mod_inverse(priv->mu, priv->phi_N, priv->pub.N, bn_ctx);
   
   BN_CTX_free(bn_ctx);
 
@@ -46,7 +46,7 @@ void paillier_encryption_free_keys (paillier_private_key_t *priv, paillier_publi
   {
     scalar_free(priv->p);
     scalar_free(priv->q);
-    scalar_free(priv->lambda);
+    scalar_free(priv->phi_N);
     scalar_free(priv->mu);
     scalar_free(priv->pub.N);
     scalar_free(priv->pub.N2);
@@ -93,7 +93,7 @@ void paillier_encryption_decrypt (scalar_t plaintext, const scalar_t ciphertext,
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   BIGNUM *res_plaintext = scalar_new();
 
-  BN_mod_exp(res_plaintext, ciphertext, priv->lambda, priv->pub.N2, bn_ctx);
+  BN_mod_exp(res_plaintext, ciphertext, priv->phi_N, priv->pub.N2, bn_ctx);
   BN_sub_word(res_plaintext, 1);
   BN_div(res_plaintext, NULL, res_plaintext, priv->pub.N, bn_ctx);
   BN_mod_mul(res_plaintext, res_plaintext, priv->mu, priv->pub.N, bn_ctx);

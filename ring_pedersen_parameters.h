@@ -20,7 +20,7 @@ typedef struct
 {
   ring_pedersen_public_t pub;
 
-  scalar_t lambda;
+  scalar_t lam;
   scalar_t phi_N;
 } ring_pedersen_private_t;
 

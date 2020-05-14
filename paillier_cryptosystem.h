@@ -20,7 +20,7 @@ typedef struct
 
   scalar_t p;
   scalar_t q;
-  scalar_t lambda;              // exponent in decryption
+  scalar_t phi_N;              // exponent in decryption
   scalar_t mu;                  // multiplicative factor in decryption
 } paillier_private_key_t;
 

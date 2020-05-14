@@ -177,11 +177,11 @@ void zkp_operation_paillier_commitment_range_prove (zkp_operation_paillier_commi
   BN_CTX_free(bn_ctx);
 }
 
-int   zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux)
+int zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux)
 {
   scalar_t z_1_range = scalar_new();
   scalar_t z_2_range = scalar_new();
-  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
+  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);         // -1 since comparing signed range
   BN_set_bit(z_2_range, 8*ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0) && (BN_ucmp(zkp->proof.z_2, z_2_range) < 0);

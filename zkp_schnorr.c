@@ -59,8 +59,6 @@ void zkp_schnorr_prove (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux, const sca
 
 int zkp_schnorr_verify (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
 {
-  int is_verified = 0;
-
   scalar_t e = scalar_new();
   zkp_schnoor_challenge(e, zkp, aux);
 
@@ -79,7 +77,7 @@ int zkp_schnorr_verify (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
 
   group_operation(rhs_value, NULL, temp_gr_elem, temp_scalars, 2, zkp->public.G);
 
-  is_verified = group_elem_equal(lhs_value, rhs_value, zkp->public.G);
+  int is_verified = group_elem_equal(lhs_value, rhs_value, zkp->public.G);
 
   scalar_free(e);
   group_elem_free(lhs_value);

@@ -7,7 +7,7 @@ ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   
   priv->phi_N = scalar_new();
-  priv->lambda = scalar_new();
+  priv->lam = scalar_new();
   priv->pub.N = scalar_new();
   priv->pub.s = scalar_new();
   priv->pub.t = scalar_new();
@@ -18,12 +18,12 @@ ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const 
   BN_sub(priv->phi_N, priv->phi_N, q);
   BN_add_word(priv->phi_N, 1);
 
-  scalar_sample_in_range(priv->lambda, priv->phi_N, 0);
+  scalar_sample_in_range(priv->lam, priv->phi_N, 0);
 
   BIGNUM *r = scalar_new();
   scalar_sample_in_range(r, priv->pub.N, 1);
   BN_mod_mul(priv->pub.t, r, r, priv->pub.N, bn_ctx);
-  BN_mod_exp(priv->pub.s, priv->pub.t, priv->lambda, priv->pub.N, bn_ctx);
+  BN_mod_exp(priv->pub.s, priv->pub.t, priv->lam, priv->pub.N, bn_ctx);
 
   scalar_free(r);
   BN_CTX_free(bn_ctx);
@@ -46,7 +46,7 @@ void  ring_pedersen_free_param(ring_pedersen_private_t *priv, ring_pedersen_publ
 {
   if (priv)
   {
-    scalar_free(priv->lambda);
+    scalar_free(priv->lam);
     scalar_free(priv->phi_N);
     scalar_free(priv->pub.N);
     scalar_free(priv->pub.s);

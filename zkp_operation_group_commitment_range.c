@@ -177,7 +177,7 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
 {
   scalar_t z_1_range = scalar_new();
   scalar_t z_2_range = scalar_new();
-  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
+  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);          // -1 since comparing signed range
   BN_set_bit(z_2_range, 8*ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0) && (BN_ucmp(zkp->proof.z_2, z_2_range) < 0);
