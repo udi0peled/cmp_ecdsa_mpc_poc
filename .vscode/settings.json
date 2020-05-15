@@ -9,6 +9,8 @@
     "objects.h": "c",
     "random": "c",
     "*.tcc": "cpp",
-    "regex": "c"
+    "regex": "c",
+    "functional": "cpp",
+    "limits": "cpp"
   },
 }

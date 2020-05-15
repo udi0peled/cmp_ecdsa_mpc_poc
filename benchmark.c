@@ -201,5 +201,5 @@ int main()
   paillier_encryption_free_keys(priv, NULL);
   ring_pedersen_free_param(rped_priv,NULL);
 
-  test_protocol_key_generation();
+  test_protocol();
 }

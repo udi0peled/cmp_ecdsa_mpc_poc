@@ -73,26 +73,20 @@ void test_group_elements()
   el[2] = group_elem_new(ec);
   printf("el = [0, 1, 2]\n");
 
-  uint8_t el_bytes[GROUP_ELEMENT_BYTES];
-  
   group_operation(el[0], NULL, (const gr_elem_t) ec_group_generator(ec), exps[0], ec);
-  EC_POINT_point2oct(ec, el[0], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
-  printHexBytes("# el[0] = ", el_bytes, sizeof(el_bytes), "\n");
+  printECPOINT("# el[0] = ", el[0], ec, "\n", 0);
   printf("el[0] = secp256k1.G * exps[0]\n");
 
   group_operation(el[1], NULL, (const gr_elem_t) ec_group_generator(ec), exps[1], ec);  
-  EC_POINT_point2oct(ec, el[1], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
-  printHexBytes("# el[1] = ", el_bytes, sizeof(el_bytes), "\n");
+  printECPOINT("# el[1] = ", el[1], ec, "\n", 0);
   printf("el[1] = secp256k1.G * exps[1]\n");
   
   group_operation(el[2], el[0], el[1],(const scalar_t) BN_value_one(), ec);
-  EC_POINT_point2oct(ec, el[2], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
-  printHexBytes("# results = ", el_bytes, sizeof(el_bytes), "\n");
+  printECPOINT("# results = ", el[2], ec, "\n", 0);
   printf("el[0] + el[1]\n");
 
   group_operation(el[2], el[0], el[1], exps[0], ec);
-  EC_POINT_point2oct(ec, el[2], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
-  printHexBytes("# results = ", el_bytes, sizeof(el_bytes), "\n");
+  printECPOINT("# results = ", el[2], ec, "\n", 0);
   printf("el[0] + el[1]**exps[0]\n");
 
   scalar_free(exps[0]);
@@ -349,28 +343,45 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
 
 #define NUM_PARTIES 3
 
-void test_protocol_key_generation()
+void execute_key_generation (cmp_party_ctx_t *parties[])
 {
-  cmp_super_session_id_t *ssid = cmp_super_session_id_new(1234, NUM_PARTIES);
-  cmp_party_ctx_t *parties[NUM_PARTIES];
-
-  // Initialize Parties
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
-  {
-    parties[i] = cmp_party_ctx_new(i, NUM_PARTIES, ssid);
-    parties[i]->parties = parties;
-  }
-
   // Execute Key Generation for all
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_init(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_1_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_2_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_3_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_final_exec(parties[i]);
 
   for (uint64_t i = 0; i < NUM_PARTIES; ++i)
   {
     cmp_key_generation_finish(parties[i]);
-    cmp_party_ctx_free(parties[i]);
+    printf("secret_%lu = ", parties[i]->party_id);
+    printBIGNUM("", parties[i]->secret_x, "\n");
+    printf("public_%lu = ", parties[i]->party_id);
+    printECPOINT("secp256k1.Point(0x", parties[i]->public_X, parties[i]->sid->ec, ")\n", 1);
   }
-  cmp_super_session_id_free(ssid);
+}
+
+void test_protocol()
+{
+  uint64_t party_ids[NUM_PARTIES] = {1, 2, 3};
+
+  cmp_session_id_t *sid = cmp_session_id_new(1234, NUM_PARTIES, party_ids);
+  cmp_party_ctx_t *parties[NUM_PARTIES];
+
+  // Initialize Parties
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  {
+    parties[i] = cmp_party_ctx_new(party_ids[i], NUM_PARTIES, sid);
+    parties[i]->parties = parties;
+  }
+
+  execute_key_generation(parties);
+
+  // Update sid byte to identify next phases
+
+  cmp_session_id_append_bytes(sid, sid->srid, sizeof(hash_chunk));
+  
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_ctx_free(parties[i]);
+  cmp_session_id_free(sid);
 }

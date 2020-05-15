@@ -15,6 +15,6 @@ void test_group_elements();
 void test_zkp_schnorr();
 void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub);
 
-void test_protocol_key_generation();
+void test_protocol();
 
 #endif
