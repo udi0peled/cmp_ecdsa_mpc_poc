@@ -14,21 +14,22 @@ typedef EC_GROUP *ec_group_t;
 typedef EC_POINT *gr_elem_t;
 typedef BIGNUM *scalar_t;
 
-scalar_t scalar_new           ();
-void scalar_free              (scalar_t num);
-void scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const scalar_t num);
-int scalar_equal              (const scalar_t a, const scalar_t b);
-void scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
-void scalar_mul               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
-void scalar_inv               (scalar_t result, const scalar_t num, const scalar_t modulus);
-void scalar_exp               (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus);
-void scalar_make_plus_minus   (scalar_t num, scalar_t num_range);
-void scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
-void sample_safe_prime        (scalar_t prime, unsigned int bits);
+scalar_t  scalar_new           ();
+void      scalar_free              (scalar_t num);
+void      scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const scalar_t num);
+int       scalar_equal             (const scalar_t a, const scalar_t b);
+void      scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
+void      scalar_mul               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
+void      scalar_inv               (scalar_t result, const scalar_t num, const scalar_t modulus);
+void      scalar_exp               (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus);
+void      scalar_make_plus_minus   (scalar_t num, scalar_t num_range);
+void      scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
+void      sample_safe_prime        (scalar_t prime, unsigned int bits);
 
 ec_group_t  ec_group_new        ();
 void        ec_group_free       (ec_group_t ec);
 scalar_t    ec_group_order      (ec_group_t ec);
+gr_elem_t   ec_group_generator  (ec_group_t ec);
 
 gr_elem_t   group_elem_new      (const ec_group_t ec);
 void        group_elem_free     (gr_elem_t el);

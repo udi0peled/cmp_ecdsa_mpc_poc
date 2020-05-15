@@ -1,4 +1,5 @@
 #include "tests.h"
+#include "cmp_ecdsa_protocol.h"
 #include <openssl/rand.h>
 
 void test_scalars(const scalar_t range, uint64_t range_byte_len)
@@ -74,12 +75,12 @@ void test_group_elements()
 
   uint8_t el_bytes[GROUP_ELEMENT_BYTES];
   
-  group_operation(el[0], NULL, (const gr_elem_t) EC_GROUP_get0_generator(ec), exps[0], ec);
+  group_operation(el[0], NULL, (const gr_elem_t) ec_group_generator(ec), exps[0], ec);
   EC_POINT_point2oct(ec, el[0], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
   printHexBytes("# el[0] = ", el_bytes, sizeof(el_bytes), "\n");
   printf("el[0] = secp256k1.G * exps[0]\n");
 
-  group_operation(el[1], NULL, (const gr_elem_t) EC_GROUP_get0_generator(ec), exps[1], ec);  
+  group_operation(el[1], NULL, (const gr_elem_t) ec_group_generator(ec), exps[1], ec);  
   EC_POINT_point2oct(ec, el[1], POINT_CONVERSION_COMPRESSED, el_bytes, sizeof(el_bytes), bn_ctx);
   printHexBytes("# el[1] = ", el_bytes, sizeof(el_bytes), "\n");
   printf("el[1] = secp256k1.G * exps[1]\n");
@@ -248,7 +249,7 @@ void test_zkp_schnorr()
   zkp_schnorr_t *zkp = zkp_schnorr_new();
   
   zkp->public.G = ec_group_new();
-  zkp->public.g = (gr_elem_t) EC_GROUP_get0_generator(zkp->public.G);
+  zkp->public.g = ec_group_generator(zkp->public.G);
   zkp->public.X = group_elem_new(zkp->public.G);
 
   zkp->secret.x = scalar_new();
@@ -260,23 +261,23 @@ void test_zkp_schnorr()
 
   zkp_schnorr_commit(zkp, alpha);
   zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# valid (1) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 1 == %d : valid\n", zkp_schnorr_verify(zkp, &aux));
 
   BN_add_word(alpha,1);
   zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# incremented alpha (1) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 1 == %d : alpha changed\n", zkp_schnorr_verify(zkp, &aux));
 
   BN_add_word(zkp->secret.x,1);
   zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# wrond secret (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 0 == %d : wrond secret.x\n", zkp_schnorr_verify(zkp, &aux));
 
   BN_sub_word(zkp->secret.x,1);
   BN_add_word(zkp->proof.z, 1);
-  printf("# wrong z (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 0 == %d : wrong z\n", zkp_schnorr_verify(zkp, &aux));
 
   aux.info = malloc(1);
   aux.info_len = 1;
-  printf("# wrong aux (0) => %d\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 0 == %d : wrong aux\n", zkp_schnorr_verify(zkp, &aux));
   
   free(aux.info);
   scalar_free(alpha);
@@ -288,7 +289,7 @@ void test_zkp_schnorr()
 
 void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub)
 {
-  printf("# test encryption_in_range\n");
+  printf("#  test encryption_in_range\n");
   zkp_aux_info_t aux;
   aux.info = NULL;
   aux.info_len = 0;
@@ -314,35 +315,62 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
   printBIGNUM("K = ", zkp->public.K, "\n");
 
   zkp_encryption_in_range_prove(zkp, &aux);
-  printf("# valid (1) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+  printf("# 1 == %d : valid \n", zkp_encryption_in_range_verify(zkp, &aux));
 
   BN_add_word(zkp->secret.k, 1);
   zkp_encryption_in_range_prove(zkp, &aux);
-  printf("# wrong secret (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+  printf("# 0 == %d : wrong secret.k\n", zkp_encryption_in_range_verify(zkp, &aux));
 
-  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
+  BN_sub_word(zkp->secret.k, 1);
+  BN_add_word(zkp->secret.rho, 1);
+  zkp_encryption_in_range_prove(zkp, &aux);
+  printf("# 0 == %d : wrong secret.rho\n", zkp_encryption_in_range_verify(zkp, &aux));
+
+  scalar_t sample_range = scalar_new();
+  BN_set_bit(sample_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES );
+  scalar_add(zkp->secret.k, zkp->secret.k, sample_range, zkp->public.paillier_pub->N);
   paillier_encryption_sample(zkp->secret.rho, paillier_pub);
   paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
   zkp_encryption_in_range_prove(zkp, &aux);
-  printf("# secret in slack (1) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
-
-  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
-  scalar_mul(zkp->secret.k, zkp->secret.k, G_order, zkp->public.paillier_pub->N);
-  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
-  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
-  zkp_encryption_in_range_prove(zkp, &aux);
-  printf("# too big secret (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
-
-  
+  printf("# 0 == %d : too big secret\n", zkp_encryption_in_range_verify(zkp, &aux));
 
   aux.info = malloc(1);
   aux.info_len = 1;
-  printf("# wrong aux (0) => %d\n", zkp_encryption_in_range_verify(zkp, &aux));
+  printf("# 0 == %d : wrong aux\n", zkp_encryption_in_range_verify(zkp, &aux));
   
   free(aux.info);
+  scalar_free(sample_range);
   scalar_free(zkp->secret.k);
   scalar_free(zkp->secret.rho);
   scalar_free(zkp->public.K);
   ec_group_free(zkp->public.G);
   zkp_encryption_in_range_free(zkp);
+}
+
+#define NUM_PARTIES 3
+
+void test_protocol_key_generation()
+{
+  cmp_super_session_id_t *ssid = cmp_super_session_id_new(1234, NUM_PARTIES);
+  cmp_party_ctx_t *parties[NUM_PARTIES];
+
+  // Initialize Parties
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  {
+    parties[i] = cmp_party_ctx_new(i, NUM_PARTIES, ssid);
+    parties[i]->parties = parties;
+  }
+
+  // Execute Key Generation for all
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_init(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_1_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_2_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_3_exec(parties[i]);
+
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  {
+    cmp_key_generation_finish(parties[i]);
+    cmp_party_ctx_free(parties[i]);
+  }
+  cmp_super_session_id_free(ssid);
 }

@@ -1,4 +1,5 @@
 #include "algebraic_elements.h"
+#include <openssl/rand.h>
 
 scalar_t  scalar_new  ()             { return BN_secure_new(); }
 void      scalar_free (scalar_t num) { BN_clear_free(num); }
@@ -8,7 +9,6 @@ void scalar_to_bytes(uint8_t *bytes, uint64_t byte_len, const scalar_t num)
   if (byte_len >= (uint64_t) BN_num_bytes(num))
     BN_bn2binpad(num, bytes, byte_len);
 }
-
 
 void scalar_add (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
 {
@@ -91,9 +91,10 @@ void sample_safe_prime(scalar_t prime, unsigned int bits)
  *  Group and Group Elements
  */
 
-ec_group_t  ec_group_new    ()                    { return EC_GROUP_new_by_curve_name(GROUP_ID); }
-void        ec_group_free   (ec_group_t ec)       { EC_GROUP_free(ec); }
-scalar_t    ec_group_order  (ec_group_t ec)       { return (scalar_t) EC_GROUP_get0_order(ec); }
+ec_group_t  ec_group_new        ()                    { return EC_GROUP_new_by_curve_name(GROUP_ID); }
+void        ec_group_free       (ec_group_t ec)       { EC_GROUP_free(ec); }
+scalar_t    ec_group_order      (ec_group_t ec)       { return (scalar_t) EC_GROUP_get0_order(ec); }
+gr_elem_t   ec_group_generator  (ec_group_t ec)       { return (gr_elem_t) EC_GROUP_get0_generator(ec); }
 
 gr_elem_t   group_elem_new (const ec_group_t ec)  { return EC_POINT_new(ec); }
 void        group_elem_free (gr_elem_t el)        { EC_POINT_clear_free(el); }
@@ -106,9 +107,7 @@ void group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const
 }
 
 /**
- *  Computes g^{g_exp}*(\Pi_i bases[i]^exps[i]).
- *  num_bases can be 0, and bases == exps NULL.
- *  if num_bases > 0, and exp == NULL, set ones (bases must of length num_bases).
+ *  Computes initial * base^exp. If initial == NULL, assume identity
  */
 void group_operation (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec)
 {

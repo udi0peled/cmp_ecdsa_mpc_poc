@@ -10,6 +10,10 @@ benchmark.o: benchmark.c common.o tests.o primitives.o
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
+cmp_ecdsa_protocol.o: cmp_ecdsa_protocol.c cmp_ecdsa_protocol.h common.o primitives.o 
+	@$(CC) $(App_C_Flags) -c $< -o $@
+	@echo "CC   <=  $<"
+
 tests.o: tests.c tests.h common.o primitives.o 
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
@@ -66,7 +70,7 @@ primitives.o: algebraic_elements.o paillier_cryptosystem.o ring_pedersen_paramet
 	@$(LD) -relocatable $^ -o $@
 	@echo "LINK =>  $@"
 
-$(Bench_Name): common.o tests.o primitives.o benchmark.o
+$(Bench_Name): common.o tests.o primitives.o cmp_ecdsa_protocol.o benchmark.o
 	@$(CXX) $^ -o $@ $(App_Link_Flags)
 	@echo "LINK =>  $@"
 

@@ -133,6 +133,7 @@ int zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_au
   is_verified &= scalar_equal(lhs_value, rhs_value);
   
   scalar_free(e);
+  scalar_free(z_1_range);
   scalar_free(lhs_value);
   scalar_free(rhs_value);
 
