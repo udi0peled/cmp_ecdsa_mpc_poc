@@ -27,53 +27,64 @@ typedef struct
 
 typedef struct 
 {
-  scalar_t tau;
-  zkp_schnorr_t *psi;
+  scalar_t  secret_x;
+  gr_elem_t public_X;
+
+  scalar_t        tau;
+  zkp_schnorr_t   *psi;
+  zkp_aux_info_t  *aux;
 
   hash_chunk srid;
   hash_chunk u;
   hash_chunk V;
   hash_chunk echo_broadcast;
 
-  uint64_t total_time;
-
-} cmp_key_generation_info_t;
+  uint64_t run_time;
+} cmp_key_generation_t;
 
 typedef struct 
 {
+  paillier_private_key_t  *paillier_priv;
+  ring_pedersen_private_t *rped_priv;
 
-  scalar_t *reshare_secret_x_i_j;
-  scalar_t *encrypted_secret_i_j;
+  scalar_t  *reshare_secret_x_i_j;
+  scalar_t  *encrypted_secret_i_j;
   gr_elem_t *reshare_public_X_i_j;
   
-  zkp_paillier_blum_modulus_t *psi;
-  zkp_paillier_blum_modulus_t *psi_prime;
-  zkp_ring_pedersen_param_t   *psi_double_prime;
+  zkp_aux_info_t              *aux;
+  scalar_t                    *tau;
+  zkp_schnorr_t               **psi_sch;
+  zkp_paillier_blum_modulus_t *psi_mod;
+  zkp_ring_pedersen_param_t   *psi_rped;
 
+  hash_chunk rho;
   hash_chunk u;
   hash_chunk V;
   hash_chunk echo_broadcast;
 
+  uint64_t prime_time;
+  uint64_t run_time;
 } cmp_refresh_aux_info_t;
 
-typedef struct cmp_party_ctx_t
+typedef struct cmp_party_t
 {
   cmp_session_id_t *sid;
 
-  uint64_t party_id;
+  uint64_t id;
+  uint64_t index;
   uint64_t num_parties;
-  struct cmp_party_ctx_t **parties;     // All parties (pointers), to get their info (just for testing, instead of communication channels)
 
-  scalar_t secret_x;                    // private key share
-  gr_elem_t public_X;                   // public key share
+  scalar_t  secret_x;                       // private key share
+  gr_elem_t public_X;                       // public key share
 
   paillier_private_key_t *paillier_priv;
   ring_pedersen_public_t *rped_pub;
 
-  cmp_key_generation_info_t *kg_data;
-  cmp_refresh_aux_info_t    *refresh_data;
+  cmp_key_generation_t    *key_generation_data;
+  cmp_refresh_aux_info_t  *refresh_aux_info_data;
 
-} cmp_party_ctx_t;
+  struct cmp_party_t **parties;             // Access all parties, to get their info, instead of communication channels
+} cmp_party_t;
 
 
 void cmp_sample_bytes (uint8_t *rand_byte, uint64_t byte_len);
@@ -83,15 +94,14 @@ cmp_session_id_t *
 void  cmp_session_id_free           (cmp_session_id_t *ssid);
 void  cmp_session_id_append_bytes   (cmp_session_id_t *sid, const uint8_t *data, uint64_t data_len);
 
-cmp_party_ctx_t *
-      cmp_party_ctx_new   (uint64_t party_id, uint64_t num_parties, cmp_session_id_t *ssid);
-void  cmp_party_ctx_free  (cmp_party_ctx_t *party_ctx);
+void  cmp_party_new   (cmp_party_t **parties, uint64_t num_parties, uint64_t index, uint64_t id, cmp_session_id_t *ssid);
+void  cmp_party_free  (cmp_party_t *party);
 
-void  cmp_key_generation_init           (cmp_party_ctx_t *party);
-void  cmp_key_generation_finish         (cmp_party_ctx_t *party);
-void  cmp_key_generation_round_1_exec   (cmp_party_ctx_t *party);
-void  cmp_key_generation_round_2_exec   (cmp_party_ctx_t *party);
-void  cmp_key_generation_round_3_exec   (cmp_party_ctx_t *party);
-void  cmp_key_generation_final_exec     (cmp_party_ctx_t *party);
+void  cmp_key_generation_init           (cmp_party_t *party);
+void  cmp_key_generation_clean          (cmp_party_t *party);
+void  cmp_key_generation_round_1_exec   (cmp_party_t *party);
+void  cmp_key_generation_round_2_exec   (cmp_party_t *party);
+void  cmp_key_generation_round_3_exec   (cmp_party_t *party);
+void  cmp_key_generation_final_exec     (cmp_party_t *party);
 
 #endif

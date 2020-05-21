@@ -84,3 +84,51 @@ void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const sca
   memset(fs_state, 0, FS_HALF);
   free(result_bytes);
 }
+
+/**
+ *  Auxiliary Information Handling
+ */
+
+zkp_aux_info_t *zkp_aux_info_new(uint64_t set_byte_len, const void *init_bytes, uint64_t init_byte_len)
+{
+  zkp_aux_info_t *aux = malloc(sizeof(*aux));
+  
+  set_byte_len = (set_byte_len >= init_byte_len ? set_byte_len : init_byte_len);
+  aux->info = malloc(set_byte_len);
+  aux->info_len = set_byte_len;
+
+  if (init_bytes) memcpy(aux->info, init_bytes, init_byte_len);
+
+  return aux;
+}
+
+void zkp_aux_info_update(zkp_aux_info_t *aux, uint64_t at_pos, const void *update_bytes, uint64_t update_byte_len)
+{
+  uint64_t new_len = at_pos + update_byte_len;
+  
+  if (new_len > aux->info_len)
+  {
+    aux->info = realloc(aux->info, new_len);
+    memset(aux->info + aux->info_len, 0x00, new_len - aux->info_len);
+    aux->info_len = new_len;
+  }
+
+  if (update_bytes)
+  {
+    memcpy(aux->info + at_pos, update_bytes, update_byte_len);
+  }
+  else
+  {
+    aux->info = realloc(aux->info, new_len);
+    memset(aux->info + new_len, 0x00, aux->info_len - new_len);
+    aux->info_len = new_len;
+  }
+}
+
+void zkp_aux_info_free(zkp_aux_info_t *aux)
+{
+  if (!aux) return;
+  
+  free(aux->info);
+  free(aux);
+}

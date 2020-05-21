@@ -1,8 +1,10 @@
 #include "algebraic_elements.h"
 #include <openssl/rand.h>
 
-scalar_t  scalar_new  ()             { return BN_secure_new(); }
-void      scalar_free (scalar_t num) { BN_clear_free(num); }
+scalar_t  scalar_new  ()                                  { return BN_secure_new(); }
+void      scalar_free (scalar_t num)                      { BN_clear_free(num); }
+void      scalar_copy (scalar_t copy, const scalar_t num) { BN_copy(copy, num); }
+void      scalar_set  (scalar_t num, unsigned long val)   { BN_set_word(num, val); }
 
 void scalar_to_bytes(uint8_t *bytes, uint64_t byte_len, const scalar_t num)
 {
@@ -15,6 +17,21 @@ void scalar_add (scalar_t result, const scalar_t first, const scalar_t second, c
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   BN_mod_add(result, first, second, modulus, bn_ctx);
   BN_CTX_free(bn_ctx);
+}
+
+void scalar_sub (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  BN_mod_sub(result, first, second, modulus, bn_ctx);
+  BN_CTX_free(bn_ctx);
+}
+
+void scalar_neg (scalar_t result, const scalar_t num, const scalar_t modulus)
+{
+  scalar_t zero = scalar_new();
+  BN_zero(zero);
+  scalar_sub(result, zero, num, modulus);
+  scalar_free(zero);
 }
 
 void scalar_mul (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
@@ -88,7 +105,7 @@ void sample_safe_prime(scalar_t prime, unsigned int bits)
 
 
 /**
- *  Group and Group Elements
+ *  EC Group 
  */
 
 ec_group_t  ec_group_new        ()                    { return EC_GROUP_new_by_curve_name(GROUP_ID); }
@@ -96,10 +113,15 @@ void        ec_group_free       (ec_group_t ec)       { EC_GROUP_free(ec); }
 scalar_t    ec_group_order      (ec_group_t ec)       { return (scalar_t) EC_GROUP_get0_order(ec); }
 gr_elem_t   ec_group_generator  (ec_group_t ec)       { return (gr_elem_t) EC_GROUP_get0_generator(ec); }
 
-gr_elem_t   group_elem_new (const ec_group_t ec)  { return EC_POINT_new(ec); }
-void        group_elem_free (gr_elem_t el)        { EC_POINT_clear_free(el); }
+/**
+ *  Group Elements
+ */
 
-void group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec)
+gr_elem_t   group_elem_new (const ec_group_t ec)                  { return EC_POINT_new(ec); }
+void        group_elem_free (gr_elem_t el)                        { EC_POINT_clear_free(el); }
+void        group_elem_copy (gr_elem_t copy, const gr_elem_t el)  { EC_POINT_copy(copy, el);}
+
+void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   EC_POINT_point2oct(ec, el, POINT_CONVERSION_COMPRESSED, bytes, byte_len, bn_ctx);
