@@ -30,6 +30,20 @@ paillier_private_key_t *paillier_encryption_generate_key ()
   return priv;
 }
 
+paillier_private_key_t *paillier_encryption_duplicate_key (const paillier_private_key_t *priv)
+{
+  paillier_private_key_t *copy = malloc(sizeof(*copy));
+
+  copy->p      = BN_dup(priv->p);
+  copy->q      = BN_dup(priv->q);
+  copy->mu     = BN_dup(priv->mu);
+  copy->phi_N  = BN_dup(priv->phi_N);
+  copy->pub.N  = BN_dup(priv->pub.N);
+  copy->pub.N2 = BN_dup(priv->pub.N2);
+
+  return copy;
+}
+
 paillier_public_key_t *paillier_encryption_copy_public (const paillier_private_key_t *priv)
 {
   paillier_public_key_t *pub = malloc(sizeof(*pub));

@@ -69,6 +69,11 @@ int scalar_equal (const scalar_t a, const scalar_t b)
   return BN_cmp(a, b) == 0;
 }
 
+int scalar_bitlength (const scalar_t a)
+{
+  return BN_num_bits(a);
+}
+
 void scalar_make_plus_minus(scalar_t num, scalar_t num_range)
 {
   scalar_t half_range = BN_dup(num_range);
@@ -129,18 +134,30 @@ void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el
 }
 
 /**
- *  Computes initial * base^exp. If initial == NULL, assume identity
+ *  Computes initial * base^exp. If initial == NULL, assume identity. If initial and base are set, exp==NULL means exp=1
  */
 void group_operation (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec)
 {
-  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  if (!base)
+  {
+    EC_POINT_set_to_infinity(ec, result);
+    return;
+  }
 
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  
   if (initial)
   {
-    gr_elem_t temp_res = group_elem_new(ec);
-    EC_POINT_mul(ec, temp_res, NULL, base, exp, bn_ctx);
-    EC_POINT_add(ec, result, initial, temp_res, bn_ctx);
-    group_elem_free(temp_res);
+    if (exp) {
+      gr_elem_t temp_res = group_elem_new(ec);
+      EC_POINT_mul(ec, temp_res, NULL, base, exp, bn_ctx);
+      EC_POINT_add(ec, result, initial, temp_res, bn_ctx);
+      group_elem_free(temp_res);
+    }
+    else
+    {
+      EC_POINT_add(ec, result, initial, base, bn_ctx);
+    }
   }
   else
   {
@@ -156,4 +173,9 @@ int group_elem_equal (const gr_elem_t a, const gr_elem_t b, const ec_group_t ec)
   int equal = EC_POINT_cmp(ec, a, b, bn_ctx) == 0;
   BN_CTX_free(bn_ctx);
   return equal;
+}
+
+int group_elem_is_ident(const gr_elem_t a, const ec_group_t ec)
+{
+  return EC_POINT_is_at_infinity(ec, a) == 1;
 }

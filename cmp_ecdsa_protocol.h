@@ -47,9 +47,9 @@ typedef struct
   paillier_private_key_t  *paillier_priv;
   ring_pedersen_private_t *rped_priv;
 
-  scalar_t  *reshare_secret_x_i_j;
-  scalar_t  *encrypted_secret_i_j;
-  gr_elem_t *reshare_public_X_i_j;
+  scalar_t  *reshare_secret_x_j;
+  scalar_t  *encrypted_reshare_j;
+  gr_elem_t *reshare_public_X_j;
   
   zkp_aux_info_t              *aux;
   scalar_t                    *tau;
@@ -58,6 +58,7 @@ typedef struct
   zkp_ring_pedersen_param_t   *psi_rped;
 
   hash_chunk rho;
+  hash_chunk combined_rho;
   hash_chunk u;
   hash_chunk V;
   hash_chunk echo_broadcast;
@@ -75,13 +76,14 @@ typedef struct cmp_party_t
   uint64_t num_parties;
 
   scalar_t  secret_x;                       // private key share
-  gr_elem_t public_X;                       // public key share
+  gr_elem_t *public_X;                      // public key shares of all partys (by index)
 
   paillier_private_key_t *paillier_priv;
-  ring_pedersen_public_t *rped_pub;
+  paillier_public_key_t  **paillier_pub;   
+  ring_pedersen_public_t **rped_pub;
 
   cmp_key_generation_t    *key_generation_data;
-  cmp_refresh_aux_info_t  *refresh_aux_info_data;
+  cmp_refresh_aux_info_t  *refresh_data;
 
   struct cmp_party_t **parties;             // Access all parties, to get their info, instead of communication channels
 } cmp_party_t;
@@ -97,11 +99,18 @@ void  cmp_session_id_append_bytes   (cmp_session_id_t *sid, const uint8_t *data,
 void  cmp_party_new   (cmp_party_t **parties, uint64_t num_parties, uint64_t index, uint64_t id, cmp_session_id_t *ssid);
 void  cmp_party_free  (cmp_party_t *party);
 
-void  cmp_key_generation_init           (cmp_party_t *party);
-void  cmp_key_generation_clean          (cmp_party_t *party);
-void  cmp_key_generation_round_1_exec   (cmp_party_t *party);
-void  cmp_key_generation_round_2_exec   (cmp_party_t *party);
-void  cmp_key_generation_round_3_exec   (cmp_party_t *party);
-void  cmp_key_generation_final_exec     (cmp_party_t *party);
+void  cmp_key_generation_init         (cmp_party_t *party);
+void  cmp_key_generation_clean        (cmp_party_t *party);
+void  cmp_key_generation_round_1_exec (cmp_party_t *party);
+void  cmp_key_generation_round_2_exec (cmp_party_t *party);
+void  cmp_key_generation_round_3_exec (cmp_party_t *party);
+void  cmp_key_generation_final_exec   (cmp_party_t *party);
+
+void  cmp_refresh_aux_info_init         (cmp_party_t *party);
+void  cmp_refresh_aux_info_clean        (cmp_party_t *party);
+void  cmp_refresh_aux_info_round_1_exec (cmp_party_t *party);
+void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party);
+void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party);
+void  cmp_refresh_aux_info_final_exec   (cmp_party_t *party);
 
 #endif

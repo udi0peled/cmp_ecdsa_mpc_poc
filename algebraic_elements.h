@@ -20,6 +20,7 @@ void      scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const sca
 void      scalar_copy              (scalar_t copy, const scalar_t num);
 void      scalar_set               (scalar_t num, unsigned long val);
 int       scalar_equal             (const scalar_t a, const scalar_t b);
+int       scalar_bitlength         (const scalar_t a);
 void      scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
 void      scalar_sub               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
 void      scalar_neg               (scalar_t result, const scalar_t num, const scalar_t modulus);
@@ -41,5 +42,6 @@ void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el
 void        group_elem_copy     (gr_elem_t copy, const gr_elem_t el);
 void        group_operation     (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 int         group_elem_equal    (const gr_elem_t a, const gr_elem_t b, const ec_group_t ec);
+int         group_elem_is_ident (const gr_elem_t a, const ec_group_t ec);
 
 #endif

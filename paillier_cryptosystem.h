@@ -25,11 +25,11 @@ typedef struct
 } paillier_private_key_t;
 
 
-paillier_private_key_t *
-      paillier_encryption_generate_key      ();
-paillier_public_key_t *
-      paillier_encryption_copy_public       (const paillier_private_key_t *priv);
-void  paillier_encryption_free_keys         (paillier_private_key_t *priv, paillier_public_key_t *pub);
+paillier_private_key_t *paillier_encryption_generate_key      ();
+paillier_private_key_t *paillier_encryption_duplicate_key     (const paillier_private_key_t *priv);
+paillier_public_key_t  *paillier_encryption_copy_public       (const paillier_private_key_t *priv);
+void                    paillier_encryption_free_keys         (paillier_private_key_t *priv, paillier_public_key_t *pub);
+
 void  paillier_encryption_sample            (scalar_t rho, const paillier_public_key_t *pub);
 void  paillier_encryption_encrypt           (scalar_t ciphertext, const scalar_t plaintext, const scalar_t rho, const paillier_public_key_t *pub);
 void  paillier_encryption_decrypt           (scalar_t plaintext, const scalar_t ciphertext, const paillier_private_key_t *priv);

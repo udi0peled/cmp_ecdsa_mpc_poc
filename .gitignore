@@ -1,2 +1,4 @@
 *.o
 *.asm
+*.pyc
+__pycache__/
