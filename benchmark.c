@@ -160,7 +160,15 @@ void time_bn_ctx(uint64_t reps)
 }
 
 int main()
-{
+{ 
+  printf("PAILLIER_MODULUS_BYTES = %lu\n", PAILLIER_MODULUS_BYTES);
+  printf("RING_PED_MODULUS_BYTES = %lu\n", RING_PED_MODULUS_BYTES);
+  printf("ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES = %lu\n", ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES);
+  printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %lu\n", ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES);
+  printf("ZKP_SCHNORR_PROOF_BYTES = %lu\n", ZKP_SCHNORR_PROOF_BYTES);
+  printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %lu\n", ZKP_GROUP_VS_PAILLIER_PROOF_BYTES);
+  printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES);
+  
   start = clock();
   
   paillier_private_key_t *priv = paillier_encryption_generate_key();
