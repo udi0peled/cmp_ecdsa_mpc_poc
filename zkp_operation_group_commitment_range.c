@@ -100,22 +100,22 @@ void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_
   scalar_t e           = scalar_new();
   scalar_t temp        = scalar_new();
 
-  BN_set_bit(alpha_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(alpha_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(alpha, alpha_range, 0);
   scalar_make_plus_minus(alpha, alpha_range);
 
-  BN_set_bit(beta_range, 8*ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(beta_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(beta, beta_range, 0);
   scalar_make_plus_minus(beta, beta_range);
 
-  BN_set_bit(gamma_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(gamma_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   BN_mul(gamma_range, gamma_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(gamma, gamma_range, 0);
   scalar_make_plus_minus(gamma, gamma_range);
   scalar_sample_in_range(delta, gamma_range, 0);
   scalar_make_plus_minus(delta, gamma_range);
   
-  BN_set_bit(mu_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES);
+  BN_set_bit(mu_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
   scalar_make_plus_minus(mu, mu_range);
@@ -179,8 +179,8 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
 {
   scalar_t z_1_range = scalar_new();
   scalar_t z_2_range = scalar_new();
-  BN_set_bit(z_1_range, 8*ELL_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);          // -1 since comparing signed range
-  BN_set_bit(z_2_range, 8*ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
+  BN_set_bit(z_1_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);          // -1 since comparing signed range
+  BN_set_bit(z_2_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0) && (BN_ucmp(zkp->proof.z_2, z_2_range) < 0);
 

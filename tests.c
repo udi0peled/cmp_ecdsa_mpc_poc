@@ -365,26 +365,35 @@ void execute_refresh_and_aux_info (cmp_party_t *parties[])
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_clean(parties[i]);
 }
 
+void execute_presigning (cmp_party_t *parties[])
+{
+  // Execute Key Generation for all
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_init(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_1_exec(parties[i]);
+  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_2_exec(parties[i]);
+  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_3_exec(parties[i]);
+  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_final_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_clean(parties[i]);
+}
+
+
 void test_protocol()
 {
-  uint64_t party_ids[NUM_PARTIES] = {333, 111, 222};
-
-  cmp_session_id_t *sid = cmp_session_id_new(1234, NUM_PARTIES, party_ids);
+  hash_chunk  sid = "Fireblocks";
+  uint64_t    party_ids[NUM_PARTIES] = {333, 111, 222};
   cmp_party_t *parties[NUM_PARTIES];
 
   // Initialize Parties
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_new(parties, NUM_PARTIES, i, party_ids[i], sid);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_new(parties, NUM_PARTIES, party_ids, i, sid);
 
   printf("\n\n# Key Generation\n\n");
   execute_key_generation(parties);
 
-  // Update sid byte to identify next phases
-  cmp_session_id_append_bytes(sid, sid->srid, sizeof(hash_chunk));
-
   printf("\n\n# Refrsh and Auxliarty Information\n\n");
   execute_refresh_and_aux_info(parties);
 
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_free(parties[i]);
+  printf("\n\n# Pre-Signing\n\n");
+  execute_presigning(parties);
 
-  cmp_session_id_free(sid);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_free(parties[i]);
 }

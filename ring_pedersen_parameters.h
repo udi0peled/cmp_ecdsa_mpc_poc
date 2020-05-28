@@ -2,11 +2,12 @@
 #include <openssl/bn.h>
 
 #include "algebraic_elements.h"
+#include "paillier_cryptosystem.h"
 
 #ifndef __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
 #define __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
 
-#define RING_PED_MODULUS_BYTES (8*GROUP_ORDER_BYTES)
+#define RING_PED_MODULUS_BYTES PAILLIER_MODULUS_BYTES // (4*GROUP_ORDER_BYTES)
 
 typedef struct
 {

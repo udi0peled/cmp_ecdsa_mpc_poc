@@ -1,7 +1,10 @@
 #include "ring_pedersen_parameters.h"
+#include <assert.h>
 
 ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const scalar_t q)
 {
+  assert((BN_num_bytes(p) == RING_PED_MODULUS_BYTES/2) && (BN_num_bytes(q) == RING_PED_MODULUS_BYTES/2));
+  
   ring_pedersen_private_t *priv = malloc(sizeof(*priv));
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();

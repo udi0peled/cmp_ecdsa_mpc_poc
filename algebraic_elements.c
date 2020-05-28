@@ -4,7 +4,13 @@
 scalar_t  scalar_new  ()                                  { return BN_secure_new(); }
 void      scalar_free (scalar_t num)                      { BN_clear_free(num); }
 void      scalar_copy (scalar_t copy, const scalar_t num) { BN_copy(copy, num); }
-void      scalar_set  (scalar_t num, unsigned long val)   { BN_set_word(num, val); }
+void      scalar_set_word  (scalar_t num, unsigned long val)   { BN_set_word(num, val); }
+
+void scalar_set_power_of_2 (scalar_t num, uint64_t two_exp)
+{
+  BN_set_word(num, 0);
+  BN_set_bit(num, two_exp);
+}
 
 void scalar_to_bytes(uint8_t *bytes, uint64_t byte_len, const scalar_t num)
 {
@@ -26,7 +32,13 @@ void scalar_sub (scalar_t result, const scalar_t first, const scalar_t second, c
   BN_CTX_free(bn_ctx);
 }
 
-void scalar_neg (scalar_t result, const scalar_t num, const scalar_t modulus)
+void scalar_negate (scalar_t result, const scalar_t num)
+{
+  BN_copy(result, num);
+  BN_set_negative(result, !BN_is_negative(result));
+}
+
+void scalar_complement (scalar_t result, const scalar_t num, const scalar_t modulus)
 {
   scalar_t zero = scalar_new();
   BN_zero(zero);
@@ -74,11 +86,10 @@ int scalar_bitlength (const scalar_t a)
   return BN_num_bits(a);
 }
 
-void scalar_make_plus_minus(scalar_t num, scalar_t num_range)
+void scalar_make_plus_minus(scalar_t num, const scalar_t num_range)
 {
   scalar_t half_range = BN_dup(num_range);
-  BN_div_word(half_range, 2);
-  BN_sub(num, num, half_range);
+  if (BN_cmp(num, half_range) > 0) BN_sub(num, num, num_range);
   scalar_free(half_range);
 }
 

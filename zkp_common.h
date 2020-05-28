@@ -14,6 +14,8 @@
 #define ELL_ZKP_RANGE_PARAMETER_BYTES (GROUP_ORDER_BYTES)
 #define EPS_ZKP_SLACK_PARAMETER_BYTES (2*GROUP_ORDER_BYTES)
 #define ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES (5*GROUP_ORDER_BYTES)
+#define CALIGRAPHIC_I_ZKP_RANGE_BYTES ELL_ZKP_RANGE_PARAMETER_BYTES
+#define CALIGRAPHIC_J_ZKP_RANGE_BYTES 3*ELL_ZKP_RANGE_PARAMETER_BYTES + EPS_ZKP_SLACK_PARAMETER_BYTES
 
 /** 
  * General Auxiliary Information for ZKProofs
@@ -26,9 +28,9 @@ typedef struct
 } zkp_aux_info_t;
 
 zkp_aux_info_t *
-      zkp_aux_info_new(uint64_t set_byte_len, const void *init_bytes, uint64_t init_byte_len);
-void  zkp_aux_info_update(zkp_aux_info_t *aux, uint64_t at_pos, const void *update_bytes, uint64_t update_byte_len);
-void  zkp_aux_info_free(zkp_aux_info_t *aux);
+      zkp_aux_info_new    (uint64_t set_byte_len, const void *init_bytes, uint64_t init_byte_len);
+void  zkp_aux_info_update (zkp_aux_info_t *aux, uint64_t at_pos, const void *update_bytes, uint64_t update_byte_len);
+void  zkp_aux_info_free   (zkp_aux_info_t *aux);
 
 void fiat_shamir_bytes            (uint8_t *digest, uint64_t digest_len, const uint8_t *data, uint64_t data_len);
 void fiat_shamir_scalars_in_range (scalar_t *results, uint64_t num_res, const scalar_t range, const uint8_t *data, uint64_t data_len);

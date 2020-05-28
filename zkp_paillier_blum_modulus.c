@@ -42,10 +42,10 @@ void  zkp_paillier_blum_challenge (scalar_t y[STATISTICAL_SECURITY], zkp_paillie
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                                     data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);                               data_pos += aux->info_len;
 
   scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->public->N);        data_pos += PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->proof.w);                data_pos += PAILLIER_MODULUS_BYTES;
+  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->proof.w);          data_pos += PAILLIER_MODULUS_BYTES;
 
   assert(fs_data + fs_data_len == data_pos);
 
