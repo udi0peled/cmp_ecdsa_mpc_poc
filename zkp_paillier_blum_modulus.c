@@ -20,6 +20,8 @@ zkp_paillier_blum_modulus_t *zkp_paillier_blum_new ()
 
 void  zkp_paillier_blum_free (zkp_paillier_blum_modulus_t *zkp)
 {
+  zkp->private = NULL;
+  
   scalar_free(zkp->proof.w);
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
@@ -187,4 +189,9 @@ int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_
   BN_CTX_free(bn_ctx);
 
   return is_verified;
+}
+
+uint64_t zkp_paillier_blum_proof_bytes ()
+{
+  return PAILLIER_MODULUS_BYTES*(1 + 2*STATISTICAL_SECURITY) + 2*STATISTICAL_SECURITY;
 }

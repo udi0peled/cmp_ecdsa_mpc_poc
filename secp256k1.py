@@ -60,10 +60,21 @@ import future
 import hashlib
 
 from builtins import int, bytes, pow
+from sympy import mod_inverse
 
 
 p = int(0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f)
 n = int(0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141)
+
+
+def mypow(b,exp,m):
+    if exp >= 0:
+        use_exp = exp
+        use_b = b
+    else:
+        use_exp = -exp
+        use_b = mod_inverse(b,m)
+    return pow(use_b, use_exp, m)
 
 
 def hash_sha256(b):

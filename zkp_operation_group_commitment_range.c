@@ -23,7 +23,12 @@ zkp_operation_group_commitment_range_t *zkp_operation_group_commitment_range_new
 
 void  zkp_operation_group_commitment_range_free   (zkp_operation_group_commitment_range_t *zkp)
 {
-  if (zkp->proof.B_x) group_elem_free(zkp->proof.B_x);
+  zkp->secret.x     = NULL;
+  zkp->secret.y     = NULL;
+  zkp->secret.rho   = NULL;
+  zkp->secret.rho_y = NULL;
+
+  group_elem_free(zkp->proof.B_x);
   scalar_free(zkp->proof.B_y);
   scalar_free(zkp->proof.A);
   scalar_free(zkp->proof.E);
@@ -44,7 +49,7 @@ void zkp_operation_group_commitment_range_challenge (scalar_t e, zkp_operation_g
 {
   // Fiat-Shamir on paillier_N_0 paillier_N_1, rped_N_s_t, g, C, D, Y, X, A, B_x, B_y, E, F, S, T
 
-  uint64_t fs_data_len = aux->info_len + 3*GROUP_ELEMENT_BYTES + 12*PAILLIER_MODULUS_BYTES + 6*RING_PED_MODULUS_BYTES;
+  uint64_t fs_data_len = aux->info_len + 3*GROUP_ELEMENT_BYTES + 12*PAILLIER_MODULUS_BYTES + 7*RING_PED_MODULUS_BYTES;
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
@@ -81,6 +86,8 @@ void zkp_operation_group_commitment_range_challenge (scalar_t e, zkp_operation_g
 
 void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_range_t *zkp, const zkp_aux_info_t *aux)
 {
+  if ((uint64_t) BN_num_bytes(zkp->secret.x) > zkp->public.x_range_bytes) return;
+  if ((uint64_t) BN_num_bytes(zkp->secret.y) > zkp->public.y_range_bytes) return;
   if (!zkp->proof.B_x) zkp->proof.B_x = group_elem_new(zkp->public.G);
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
@@ -100,22 +107,22 @@ void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_
   scalar_t e           = scalar_new();
   scalar_t temp        = scalar_new();
 
-  BN_set_bit(alpha_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(alpha_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(alpha, alpha_range, 0);
   scalar_make_plus_minus(alpha, alpha_range);
 
-  BN_set_bit(beta_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(beta_range, 8*zkp->public.y_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(beta, beta_range, 0);
   scalar_make_plus_minus(beta, beta_range);
 
-  BN_set_bit(gamma_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(gamma_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   BN_mul(gamma_range, gamma_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(gamma, gamma_range, 0);
   scalar_make_plus_minus(gamma, gamma_range);
   scalar_sample_in_range(delta, gamma_range, 0);
   scalar_make_plus_minus(delta, gamma_range);
   
-  BN_set_bit(mu_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES);
+  BN_set_bit(mu_range, 8*zkp->public.x_range_bytes);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
   scalar_make_plus_minus(mu, mu_range);
@@ -179,8 +186,8 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
 {
   scalar_t z_1_range = scalar_new();
   scalar_t z_2_range = scalar_new();
-  BN_set_bit(z_1_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);          // -1 since comparing signed range
-  BN_set_bit(z_2_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
+  BN_set_bit(z_1_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);          // -1 since comparing signed range
+  BN_set_bit(z_2_range, 8*zkp->public.y_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0) && (BN_ucmp(zkp->proof.z_2, z_2_range) < 0);
 
@@ -228,4 +235,9 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
   group_elem_free(rhs_gr_elem);
 
   return is_verified;
+}
+
+uint64_t zkp_operation_group_commitment_range_proof_bytes (uint64_t x_range_bytes, uint64_t y_range_bytes)
+{
+  return GROUP_ELEMENT_BYTES + 6*RING_PED_MODULUS_BYTES + 6*PAILLIER_MODULUS_BYTES + 3*x_range_bytes + y_range_bytes + 4*EPS_ZKP_SLACK_PARAMETER_BYTES;
 }

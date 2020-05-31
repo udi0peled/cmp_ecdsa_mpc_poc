@@ -15,6 +15,8 @@ zkp_ring_pedersen_param_t *zkp_ring_pedersen_param_new ()
 
 void zkp_ring_pedersen_param_free (zkp_ring_pedersen_param_t *zkp)
 {
+  zkp->secret = NULL;
+
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
   {
     scalar_free(zkp->proof.A[i]);
@@ -101,4 +103,9 @@ int   zkp_ring_pedersen_param_verify (zkp_ring_pedersen_param_t *zkp, const zkp_
   BN_CTX_free(bn_ctx);
 
   return is_verified;
+}
+
+uint64_t zkp_ring_pedersen_param_proof_bytes ()
+{
+  return 2*RING_PED_MODULUS_BYTES*STATISTICAL_SECURITY;
 }

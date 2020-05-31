@@ -370,8 +370,8 @@ void execute_presigning (cmp_party_t *parties[])
   // Execute Key Generation for all
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_init(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_1_exec(parties[i]);
-  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_2_exec(parties[i]);
-  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_3_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_2_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_3_exec(parties[i]);
   //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_final_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_clean(parties[i]);
 }

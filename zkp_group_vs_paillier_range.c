@@ -17,7 +17,10 @@ zkp_group_vs_paillier_range_t *zkp_group_vs_paillier_range_new()
 
 void  zkp_group_vs_paillier_range_free   (zkp_group_vs_paillier_range_t *zkp)
 {
-  if (zkp->proof.Y) group_elem_free(zkp->proof.Y);
+  zkp->secret.x   = NULL;
+  zkp->secret.rho = NULL;
+
+  group_elem_free(zkp->proof.Y);
   scalar_free(zkp->proof.A);
   scalar_free(zkp->proof.D);
   scalar_free(zkp->proof.S);
@@ -63,6 +66,7 @@ void zkp_group_vs_paillier_range_challenge (scalar_t e, zkp_group_vs_paillier_ra
 
 void zkp_group_vs_paillier_range_prove (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux)
 {
+  if ((uint64_t) BN_num_bytes(zkp->secret.x) > zkp->public.x_range_bytes) return; 
   if (!zkp->proof.Y) zkp->proof.Y = group_elem_new(zkp->public.G);
   
   BN_CTX *bn_ctx = BN_CTX_secure_new();
@@ -75,22 +79,22 @@ void zkp_group_vs_paillier_range_prove (zkp_group_vs_paillier_range_t *zkp, cons
   scalar_t mu          = scalar_new();
   scalar_t r           = scalar_new();
   scalar_t e           = scalar_new();
-
-  BN_set_bit(alpha_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  
+  BN_set_bit(alpha_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(alpha, alpha_range, 0);
   scalar_make_plus_minus(alpha, alpha_range);
 
-  BN_set_bit(gamma_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(gamma_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   BN_mul(gamma_range, gamma_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(gamma, gamma_range, 0);
   scalar_make_plus_minus(gamma, gamma_range);
   
-  BN_set_bit(mu_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES);
+  BN_set_bit(mu_range, 8*zkp->public.x_range_bytes);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
   scalar_make_plus_minus(mu, mu_range);
 
-  group_operation(zkp->proof.Y, NULL, zkp->public.g, zkp->secret.x, zkp->public.G);
+  group_operation(zkp->proof.Y, NULL, zkp->public.g, alpha, zkp->public.G);
 
   paillier_encryption_sample(r, zkp->public.paillier_pub);  
   paillier_encryption_encrypt(zkp->proof.A, alpha, r, zkp->public.paillier_pub);
@@ -125,7 +129,7 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
   if (!zkp->proof.Y) zkp->proof.Y = group_elem_new(zkp->public.G);
 
   scalar_t z_1_range = scalar_new();
-  BN_set_bit(z_1_range, 8*CALIGRAPHIC_I_ZKP_RANGE_BYTES + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);     // -1 since comparing signed range
+  BN_set_bit(z_1_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES - 1);     // -1 since comparing signed range
 
   int is_verified = (BN_ucmp(zkp->proof.z_1, z_1_range) < 0);
 
@@ -147,7 +151,7 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
 
   gr_elem_t lhs_gr_elem = group_elem_new(zkp->public.G);
   gr_elem_t rhs_gr_elem = group_elem_new(zkp->public.G);
-
+  
   group_operation(lhs_gr_elem, NULL, zkp->public.g, zkp->proof.z_1, zkp->public.G);
   group_operation(rhs_gr_elem, zkp->proof.Y, zkp->public.X, e, zkp->public.G);
   is_verified &= group_elem_equal(lhs_gr_elem, rhs_gr_elem, zkp->public.G);
@@ -159,4 +163,9 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
   group_elem_free(rhs_gr_elem);
 
   return is_verified;
+}
+
+uint64_t zkp_group_vs_paillier_range_proof_bytes (uint64_t x_range_bytes)
+{
+  return GROUP_ELEMENT_BYTES + 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*x_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
 }

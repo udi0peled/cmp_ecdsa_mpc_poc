@@ -12,7 +12,9 @@ zkp_schnorr_t *zkp_schnorr_new()
 
 void zkp_schnorr_free (zkp_schnorr_t *zkp)
 {
-  if (zkp->proof.A) group_elem_free(zkp->proof.A);
+  zkp->secret.x = NULL;
+
+  group_elem_free(zkp->proof.A);
   scalar_free(zkp->proof.z);
   free(zkp);
 }
@@ -81,4 +83,7 @@ int zkp_schnorr_verify (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
   return is_verified;
 }
 
-
+uint64_t zkp_schnorr_proof_bytes ()
+{
+  return GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES;
+}

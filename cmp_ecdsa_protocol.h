@@ -3,7 +3,12 @@
 #ifndef __CMP20_ECDSA_MPC_PROTOCOL_H__
 #define __CMP20_ECDSA_MPC_PROTOCOL_H__
 
-#define KAPPA_RANDOM_ORACLE_BYTES 64      // RO input and output
+#define KAPPA_RANDOM_ORACLE_BYTES 64                              // RO input and output
+
+#define ELL_ZKP_RANGE_PARAMETER_BYTES (GROUP_ORDER_BYTES)
+#define ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES (5*GROUP_ORDER_BYTES)
+#define CALIGRAPHIC_I_ZKP_RANGE_BYTES (ELL_ZKP_RANGE_PARAMETER_BYTES)
+#define CALIGRAPHIC_J_ZKP_RANGE_BYTES (3*ELL_ZKP_RANGE_PARAMETER_BYTES + EPS_ZKP_SLACK_PARAMETER_BYTES)
 
 typedef uint8_t hash_chunk[KAPPA_RANDOM_ORACLE_BYTES];
 
@@ -79,7 +84,8 @@ typedef struct
   zkp_encryption_in_range_t                 **psi_enc;
   zkp_operation_paillier_commitment_range_t **psi_affp;
   zkp_operation_group_commitment_range_t    **psi_affg;
-  zkp_group_vs_paillier_range_t             **psi_log;
+  zkp_group_vs_paillier_range_t             **psi_logG;
+  zkp_group_vs_paillier_range_t             **psi_logK;
 
   hash_chunk echo_broadcast;
 

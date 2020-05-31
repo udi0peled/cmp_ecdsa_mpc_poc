@@ -3,8 +3,6 @@
 #ifndef __CMP20_ECDSA_MPC_ZKP_OPERATION_VS_PAILLIER_H__
 #define __CMP20_ECDSA_MPC_ZKP_OPERATION_VS_PAILLIER_H__
 
-#define ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES (6*RING_PED_MODULUS_BYTES + 9*PAILLIER_MODULUS_BYTES + 3*CALIGRAPHIC_I_ZKP_RANGE_BYTES + CALIGRAPHIC_J_ZKP_RANGE_BYTES + 4*EPS_ZKP_SLACK_PARAMETER_BYTES)
-
 /** 
  *  Paillier Affine Operation with Paillier Commitment in Range ZKProof 
  */
@@ -12,6 +10,8 @@
 typedef struct
 {
   struct { 
+    uint64_t x_range_bytes;
+    uint64_t y_range_bytes;
     ring_pedersen_public_t *rped_pub;
     paillier_public_key_t *paillier_pub_0;      // Encrypted the public C
     paillier_public_key_t *paillier_pub_1;      // Encrypted the secret y
@@ -51,9 +51,10 @@ typedef struct
 // Zero Knowledge Proofs
 
 zkp_operation_paillier_commitment_range_t*
-      zkp_operation_paillier_commitment_range_new    ();
-void  zkp_operation_paillier_commitment_range_free   (zkp_operation_paillier_commitment_range_t *zkp);
-void  zkp_operation_paillier_commitment_range_prove  (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
-int   zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+         zkp_operation_paillier_commitment_range_new         ();
+void     zkp_operation_paillier_commitment_range_free        (zkp_operation_paillier_commitment_range_t *zkp);
+void     zkp_operation_paillier_commitment_range_prove       (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+int      zkp_operation_paillier_commitment_range_verify      (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+uint64_t zkp_operation_paillier_commitment_range_proof_bytes (uint64_t x_range_proof, uint64_t y_range_proof);
 
 #endif

@@ -163,11 +163,12 @@ int main()
 { 
   printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
   printf("RING_PED_MODULUS_BYTES = %u\n", RING_PED_MODULUS_BYTES);
-  printf("ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES = %u\n", ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES);
-  printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %u\n", ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES);
-  printf("ZKP_SCHNORR_PROOF_BYTES = %u\n", ZKP_SCHNORR_PROOF_BYTES);
-  printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %u\n", ZKP_GROUP_VS_PAILLIER_PROOF_BYTES);
-  printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %u\n", ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES);
+  printf("ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES = %lu\n", zkp_paillier_blum_proof_bytes());
+  printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %lu\n", zkp_ring_pedersen_param_proof_bytes());
+  printf("ZKP_SCHNORR_PROOF_BYTES = %lu\n", zkp_schnorr_proof_bytes());
+  printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %lu\n", zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES));
+  printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
+  printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
   
   start = clock();
   

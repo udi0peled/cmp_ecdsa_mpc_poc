@@ -89,6 +89,7 @@ int scalar_bitlength (const scalar_t a)
 void scalar_make_plus_minus(scalar_t num, const scalar_t num_range)
 {
   scalar_t half_range = BN_dup(num_range);
+  BN_div_word(half_range, 2);
   if (BN_cmp(num, half_range) > 0) BN_sub(num, num, num_range);
   scalar_free(half_range);
 }

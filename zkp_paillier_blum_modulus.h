@@ -9,8 +9,6 @@
 #ifndef __CMP20_ECDSA_MPC_ZKP_PAILLIER_BLUM_H__
 #define __CMP20_ECDSA_MPC_ZKP_PAILLIER_BLUM_H__
 
-#define ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES (PAILLIER_MODULUS_BYTES*(1 + 2*STATISTICAL_SECURITY) + 2*STATISTICAL_SECURITY)
-
 typedef struct
 {
   paillier_public_key_t *public;
@@ -27,9 +25,10 @@ typedef struct
 } zkp_paillier_blum_modulus_t;
 
 zkp_paillier_blum_modulus_t *
-      zkp_paillier_blum_new    ();
-void  zkp_paillier_blum_free   (zkp_paillier_blum_modulus_t *zkp);
-void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
-int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+         zkp_paillier_blum_new         ();
+void     zkp_paillier_blum_free        (zkp_paillier_blum_modulus_t *zkp);
+void     zkp_paillier_blum_prove       (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+int      zkp_paillier_blum_verify      (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+uint64_t zkp_paillier_blum_proof_bytes ();
 
 #endif
