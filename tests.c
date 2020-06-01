@@ -454,6 +454,8 @@ void execute_signing (cmp_party_t *parties[])
 
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) scalar_free(r[i]);
   free(r);
+  scalar_free(s);
+  scalar_free(msg);
   scalar_free(sigma);
   group_elem_free(pubkey);
 }
