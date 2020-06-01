@@ -72,13 +72,9 @@ void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const sca
     while (BN_cmp(results[i_res], range) != -1)
     {
       fiat_shamir_bytes_from_state(result_bytes, num_bytes, data, data_len, fs_state);
-      // UDIBUG: printHexBytes("result_bytes = ", result_bytes, num_bytes, "\n");
       BN_bin2bn(result_bytes, num_bytes, results[i_res]);
-      // UDIBUG: printBIGNUM("result (before trunc)= ", results[i_res], "\n");
       BN_mask_bits(results[i_res], num_bits);
-      // UDIBUG: printBIGNUM("result (after trunc)= ", results[i_res], "\n");
     }
-    // UDIBUG: printf("\n");
   }
 
   memset(fs_state, 0, FS_HALF);

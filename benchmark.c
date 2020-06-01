@@ -115,7 +115,7 @@ void time_bn_ctx(uint64_t reps)
   BN_CTX **bn_ctx_arr = calloc(reps, sizeof(BN_CTX*));
 
   printf("# timing bn_ctx_secure_new + operation, each fresh\n");
-  printBIGNUM("secp256k1.G * ", a[0], "\n");
+  printBIGNUM("G * ", a[0], "\n");
 
   start = clock();
 

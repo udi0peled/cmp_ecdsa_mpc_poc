@@ -191,3 +191,11 @@ int group_elem_is_ident(const gr_elem_t a, const ec_group_t ec)
 {
   return EC_POINT_is_at_infinity(ec, a) == 1;
 }
+
+void group_elem_get_x (scalar_t x, const gr_elem_t point, const ec_group_t ec, scalar_t modulus)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  EC_POINT_get_affine_coordinates(ec, point, x, NULL, bn_ctx);
+  BN_mod(x, x, modulus, bn_ctx);
+  BN_CTX_free(bn_ctx);
+}

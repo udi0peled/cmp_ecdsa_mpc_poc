@@ -5,7 +5,7 @@ Pure python implementation for ``scp256k1`` curve algebra and associated
 ``ECDSA - SCHNORR`` signatures.
 
 >>> from dposlib.ark import secp256k1
->>> G = secp256k1.Point(0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2\
+>>> G = Point(0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2\
 815B16F81798)
 >>> G.y
 32670510020758816978083085130507043184471273380659243275938904335757337482424
@@ -17,18 +17,18 @@ Pure python implementation for ``scp256k1`` curve algebra and associated
 >>> G+G == 2*G
 True
 
->>> secp256k1.PublicKey.from_int(secp256k1.int_from_bytes(secp256k1.hash_sha25\
+>>> PublicKey.from_int(int_from_bytes(hash_sha25\
 6("secret")))
 <secp256k1 public key:
   x:a02b9d5fdd1307c2ee4652ba54d492d1fd11a7d1bb3f3a44c4a05e79f19de933
   y:924aa2580069952b0140d88de21c367ee4af7c4a906e1498f20ab8f62e4c2921
 >
->>> secp256k1.PublicKey.from_seed(secp256k1.hash_sha256("secret"))
+>>> PublicKey.from_seed(hash_sha256("secret"))
 <secp256k1 public key:
   x:a02b9d5fdd1307c2ee4652ba54d492d1fd11a7d1bb3f3a44c4a05e79f19de933
   y:924aa2580069952b0140d88de21c367ee4af7c4a906e1498f20ab8f62e4c2921
 >
->>> secp256k1.PublicKey.from_secret("secret")
+>>> PublicKey.from_secret("secret")
 <secp256k1 public key:
   x:a02b9d5fdd1307c2ee4652ba54d492d1fd11a7d1bb3f3a44c4a05e79f19de933
   y:924aa2580069952b0140d88de21c367ee4af7c4a906e1498f20ab8f62e4c2921

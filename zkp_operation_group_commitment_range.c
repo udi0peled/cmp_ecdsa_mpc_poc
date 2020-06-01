@@ -162,8 +162,8 @@ void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_
   scalar_mul(zkp->proof.w, r, temp, zkp->public.paillier_pub_0->N);
 
   scalar_exp(temp, zkp->secret.rho_y, e, zkp->public.paillier_pub_1->N);
-  scalar_mul(zkp->proof.w, r_y, temp, zkp->public.paillier_pub_1->N);
-  
+  scalar_mul(zkp->proof.w_y, r_y, temp, zkp->public.paillier_pub_1->N);
+
   scalar_free(temp);
   scalar_free(e);
   scalar_free(r_y);
@@ -231,6 +231,8 @@ int   zkp_operation_group_commitment_range_verify (zkp_operation_group_commitmen
   scalar_free(temp);
   scalar_free(lhs_value);
   scalar_free(rhs_value);
+  scalar_free(z_1_range);
+  scalar_free(z_2_range);
   group_elem_free(lhs_gr_elem);
   group_elem_free(rhs_gr_elem);
 

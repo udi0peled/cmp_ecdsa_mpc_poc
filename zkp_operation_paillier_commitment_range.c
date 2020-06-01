@@ -124,7 +124,7 @@ void zkp_operation_paillier_commitment_range_prove (zkp_operation_paillier_commi
   scalar_sample_in_range(delta, gamma_range, 0);
   scalar_make_plus_minus(delta, gamma_range);
   
-  BN_set_bit(mu_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
+  BN_set_bit(mu_range, 8*zkp->public.x_range_bytes);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
   scalar_make_plus_minus(mu, mu_range);
@@ -209,33 +209,17 @@ int zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commi
   scalar_exp(temp, zkp->public.X, e, zkp->public.paillier_pub_1->N2);
   scalar_mul(rhs_value, zkp->proof.B_x, temp, zkp->public.paillier_pub_1->N2);
   is_verified &= scalar_equal(lhs_value, rhs_value);
-  
 
   paillier_encryption_encrypt(lhs_value, zkp->proof.z_2, zkp->proof.w_y, zkp->public.paillier_pub_1);
   scalar_exp(temp, zkp->public.Y, e, zkp->public.paillier_pub_1->N2);
   scalar_mul(rhs_value, zkp->proof.B_y, temp, zkp->public.paillier_pub_1->N2);
   is_verified &= scalar_equal(lhs_value, rhs_value);
-
-  printBIGNUM("N2 = ", zkp->public.paillier_pub_0->N2, "\n");
-  printBIGNUM("N = ", zkp->public.paillier_pub_0->N, "\n");
-  printBIGNUM("z_2 = ", zkp->proof.z_2, "\n");
-  printBIGNUM("w = ", zkp->proof.w, "\n");
-  printBIGNUM("z_1 = ", zkp->proof.z_1, "\n");
-  printBIGNUM("C = ", zkp->public.C, "\n");
-  printBIGNUM("e = ", e, "\n");
-  printBIGNUM("D = ", zkp->public.D, "\n");
-  printBIGNUM("A = ", zkp->proof.A, "\n");
   
   paillier_encryption_encrypt(temp, zkp->proof.z_2, zkp->proof.w, zkp->public.paillier_pub_0);
-  printBIGNUM("temp1 = ", temp, "\n");
   scalar_exp(lhs_value, zkp->public.C, zkp->proof.z_1, zkp->public.paillier_pub_0->N2);
-  printBIGNUM("lhs1 = ", lhs_value, "\n");
   scalar_mul(lhs_value, lhs_value, temp, zkp->public.paillier_pub_0->N2);
-  printBIGNUM("lhs2 = ", lhs_value, "\n");
   scalar_exp(temp, zkp->public.D, e, zkp->public.paillier_pub_0->N2);
-  printBIGNUM("temp2 = ", temp, "\n");
   scalar_mul(rhs_value, zkp->proof.A, temp, zkp->public.paillier_pub_0->N2);
-  printBIGNUM("rhs = ", rhs_value, "\n");
   is_verified &= scalar_equal(lhs_value, rhs_value);
 
   ring_pedersen_commit(lhs_value, zkp->proof.z_1, zkp->proof.z_3, zkp->public.rped_pub);
@@ -250,6 +234,10 @@ int zkp_operation_paillier_commitment_range_verify (zkp_operation_paillier_commi
 
   scalar_free(e);
   scalar_free(temp);
+  scalar_free(lhs_value);
+  scalar_free(rhs_value);
+  scalar_free(z_1_range);
+  scalar_free(z_2_range);
 
   return is_verified;
 }

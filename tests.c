@@ -24,7 +24,7 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
 
   uint8_t *alpha_bytes = malloc(range_byte_len);
   scalar_to_bytes(alpha_bytes, range_byte_len, alpha);
-  printHexBytes("alpha_bytes = 0x", alpha_bytes, range_byte_len, "\n");
+  printHexBytes("alpha_bytes = 0x", alpha_bytes, range_byte_len, "\n", 1);
 
   scalar_make_plus_minus(alpha, range);
   printBIGNUM("alpha_s = ", alpha, "\n");
@@ -75,11 +75,11 @@ void test_group_elements()
 
   group_operation(el[0], NULL, (const gr_elem_t) ec_group_generator(ec), exps[0], ec);
   printECPOINT("# el[0] = ", el[0], ec, "\n", 0);
-  printf("el[0] = secp256k1.G * exps[0]\n");
+  printf("el[0] = G * exps[0]\n");
 
   group_operation(el[1], NULL, (const gr_elem_t) ec_group_generator(ec), exps[1], ec);  
   printECPOINT("# el[1] = ", el[1], ec, "\n", 0);
-  printf("el[1] = secp256k1.G * exps[1]\n");
+  printf("el[1] = G * exps[1]\n");
   
   group_operation(el[2], el[0], el[1],(const scalar_t) BN_value_one(), ec);
   printECPOINT("# results = ", el[2], ec, "\n", 0);
@@ -187,8 +187,8 @@ void test_fiat_shamir(uint64_t digest_len, uint64_t data_len)
   RAND_bytes(data, data_len);
 
   printf("# test_fiat_shamir\n");
-  printHexBytes("data = ", zeros, sizeof(zeros), "");
-  printHexBytes("", data, data_len, "\n");
+  printHexBytes("data = ", zeros, sizeof(zeros), "", 1);
+  printHexBytes("", data, data_len, "\n", 1);
 
   uint8_t *digest = malloc(digest_len);
   fiat_shamir_bytes(digest, digest_len, data, data_len);
@@ -196,7 +196,7 @@ void test_fiat_shamir(uint64_t digest_len, uint64_t data_len)
   printf("digest = ");
   for (uint64_t i = 0; i < digest_len; i += 32)
   {
-    printHexBytes("", digest + i, (digest_len - i <  32  ? digest_len - i : 32), " ");
+    printHexBytes("", digest + i, (digest_len - i <  32  ? digest_len - i : 32), " ", 1);
   }
   printf("\n");
 
@@ -365,6 +365,25 @@ void execute_refresh_and_aux_info (cmp_party_t *parties[])
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_clean(parties[i]);
 }
 
+void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[])
+{
+  gr_elem_t *pub = calloc(NUM_PARTIES, sizeof(gr_elem_t));
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  {
+    pub[i] = group_elem_new(parties[i]->ec);
+    group_elem_copy(pub[i], parties[i]->public_X[0]);
+    for (uint64_t k = 1; k < parties[i]->num_parties; ++k)
+    { 
+      group_operation(pub[i], pub[i], parties[i]->public_X[k], NULL, parties[i]->ec);  
+    }
+    assert(group_elem_equal(pub[0], pub[i], parties[0]->ec));
+  }
+  group_elem_copy(pubkey, pub[0]);
+
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) group_elem_free(pub[i]);
+  free(pub);
+}
+
 void execute_presigning (cmp_party_t *parties[])
 {
   // Execute Key Generation for all
@@ -372,8 +391,71 @@ void execute_presigning (cmp_party_t *parties[])
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_1_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_2_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_3_exec(parties[i]);
-  //for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_final_exec(parties[i]);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_final_exec(parties[i]);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_clean(parties[i]);
+}
+
+int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
+{
+  ec_group_t ec    = ec_group_new();
+  gr_elem_t gen    = ec_group_generator(ec);
+  scalar_t ord     = ec_group_order(ec);
+  gr_elem_t result = group_elem_new(ec);
+
+  scalar_t s_inv = scalar_new();
+  scalar_inv(s_inv, s, ord);
+
+  group_operation(result, NULL, gen, msg, ec);
+  group_operation(result, result, pubkey, r, ec);
+  group_operation(result, NULL, result, s_inv, ec);
+
+  scalar_t project_x = scalar_new();
+  group_elem_get_x(project_x, result, ec, ord);
+
+  int is_valid = scalar_equal(project_x, r);
+
+  group_elem_free(result);
+  scalar_free(s_inv);
+  scalar_free(project_x);
+  ec_group_free(ec);
+
+  return is_valid;
+}
+
+void execute_signing (cmp_party_t *parties[])
+{
+  scalar_t *r     = calloc(NUM_PARTIES, sizeof(scalar_t)); 
+  
+  scalar_t s     = scalar_new();
+  scalar_t msg   = scalar_new();
+  scalar_t sigma = scalar_new();
+  
+  scalar_sample_in_range(msg, parties[0]->ec_order, 0);
+  scalar_set_word(s, 0);
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  {
+    r[i] = scalar_new();
+    cmp_signature_share(r[i], sigma, parties[i], msg);
+    scalar_add(s, s, sigma, parties[i]->ec_order);
+    assert(scalar_equal(r[0], r[i]));
+  }
+
+  // Validate Signature
+  
+  gr_elem_t pubkey = group_elem_new(parties[0]->ec);
+  get_public_key(pubkey, parties);
+
+  printBIGNUM("msg = ", msg, "\n");
+  printBIGNUM("r = ", r[0], "\n");
+  printBIGNUM("s = ", s, "\n");
+  printECPOINT("pubkey = ", pubkey, parties[0]->ec, "\n", 1);
+
+  assert(signature_verify(r[0], s, msg, pubkey));
+
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) scalar_free(r[i]);
+  free(r);
+  scalar_free(sigma);
+  group_elem_free(pubkey);
 }
 
 
@@ -394,6 +476,9 @@ void test_protocol()
 
   printf("\n\n# Pre-Signing\n\n");
   execute_presigning(parties);
+
+  printf("\n\n# Pre-Signing\n\n");
+  execute_signing(parties);
 
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_free(parties[i]);
 }

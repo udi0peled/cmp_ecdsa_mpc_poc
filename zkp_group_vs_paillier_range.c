@@ -159,6 +159,7 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
   scalar_free(e);
   scalar_free(lhs_value);
   scalar_free(rhs_value);
+  scalar_free(z_1_range);
   group_elem_free(lhs_gr_elem);
   group_elem_free(rhs_gr_elem);
 

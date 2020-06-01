@@ -45,5 +45,6 @@ void        group_elem_copy     (gr_elem_t copy, const gr_elem_t el);
 void        group_operation     (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 int         group_elem_equal    (const gr_elem_t a, const gr_elem_t b, const ec_group_t ec);
 int         group_elem_is_ident (const gr_elem_t a, const ec_group_t ec);
+void        group_elem_get_x    (scalar_t x, const gr_elem_t a, const ec_group_t ec, scalar_t modulus);
 
 #endif

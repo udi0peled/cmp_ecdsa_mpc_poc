@@ -8,7 +8,7 @@
 #define ELL_ZKP_RANGE_PARAMETER_BYTES (GROUP_ORDER_BYTES)
 #define ELL_PRIME_ZKP_RANGE_PARAMETER_BYTES (5*GROUP_ORDER_BYTES)
 #define CALIGRAPHIC_I_ZKP_RANGE_BYTES (ELL_ZKP_RANGE_PARAMETER_BYTES)
-#define CALIGRAPHIC_J_ZKP_RANGE_BYTES (3*ELL_ZKP_RANGE_PARAMETER_BYTES + EPS_ZKP_SLACK_PARAMETER_BYTES)
+#define CALIGRAPHIC_J_ZKP_RANGE_BYTES (EPS_ZKP_SLACK_PARAMETER_BYTES + ELL_ZKP_RANGE_PARAMETER_BYTES*3)
 
 typedef uint8_t hash_chunk[KAPPA_RANDOM_ORACLE_BYTES];
 
@@ -66,6 +66,7 @@ typedef struct
   scalar_t nu;
   scalar_t gamma;
   scalar_t delta;
+  scalar_t chi;
 
   scalar_t *alpha_j;
   scalar_t *beta_j;
@@ -119,14 +120,19 @@ typedef struct cmp_party_t
   cmp_refresh_aux_info_t  *refresh_data;
   cmp_presigning_t        *presigning_data;
 
+  gr_elem_t R;
+  scalar_t k;
+  scalar_t chi;
+
   struct cmp_party_t **parties;
 } cmp_party_t;
 
 
 void cmp_sample_bytes (uint8_t *rand_byte, uint64_t byte_len);
 
-void cmp_party_new (cmp_party_t **parties, uint64_t num_parties, const uint64_t *parties_ids, uint64_t index, const hash_chunk sid);
-void cmp_party_free  (cmp_party_t *party);
+void cmp_party_new  (cmp_party_t **parties, uint64_t num_parties, const uint64_t *parties_ids, uint64_t index, const hash_chunk sid);
+void cmp_party_free (cmp_party_t *party);
+
 void cmp_key_generation_init         (cmp_party_t *party);
 void cmp_key_generation_clean        (cmp_party_t *party);
 void cmp_key_generation_round_1_exec (cmp_party_t *party);
@@ -147,5 +153,7 @@ void cmp_presigning_round_1_exec (cmp_party_t *party);
 void cmp_presigning_round_2_exec (cmp_party_t *party);
 void cmp_presigning_round_3_exec (cmp_party_t *party);
 void cmp_presigning_final_exec   (cmp_party_t *party);
+
+void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, const scalar_t msg);
 
 #endif
