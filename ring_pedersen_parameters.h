@@ -1,13 +1,25 @@
+/**
+ * 
+ *  Name:
+ *  ring_pedersen_parameters
+ *  
+ *  Description:
+ *  Basic ring pedersen parameters and commitment generation.
+ * 
+ *  Usage:
+ *  Generate private key from given two prime (computed N and sample random s,t,lam as required), from which also public key can be extracted.
+ *  Compute ring pedersen commitments.
+ * 
+ */
+
+#ifndef __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
+#define __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
+
 #include <stdint.h>
 #include <openssl/bn.h>
 
 #include "algebraic_elements.h"
 #include "paillier_cryptosystem.h"
-
-#ifndef __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
-#define __CMP20_ECDSA_MPC_RING_PEDERSEN_PARAMS_H__
-
-#define RING_PED_MODULUS_BYTES PAILLIER_MODULUS_BYTES // (4*GROUP_ORDER_BYTES)
 
 typedef struct
 {
@@ -26,12 +38,12 @@ typedef struct
 } ring_pedersen_private_t;
 
 
-ring_pedersen_private_t *
-      ring_pedersen_generate_param  (const scalar_t p, const scalar_t q);       // Assumes p,q safe primes (no check)
-ring_pedersen_public_t *
-      ring_pedersen_copy_public     (const ring_pedersen_private_t *priv);
-void  ring_pedersen_free_param      (ring_pedersen_private_t *priv, ring_pedersen_public_t *pub);
-void  ring_pedersen_commit          (scalar_t rped_commitment, const scalar_t s_exp, const scalar_t t_exp, const ring_pedersen_public_t *rped_pub);
+// Assumes p,q safe primes, doesn't check for it.
+ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const scalar_t q);
+ring_pedersen_public_t  *ring_pedersen_copy_public     (const ring_pedersen_private_t *priv);
+// Free keys, each can be NULL and ignored. Public inside private is freed with private, shouldn't be freeed seperately
+void                     ring_pedersen_free_param      (ring_pedersen_private_t *priv, ring_pedersen_public_t *pub);
+void                     ring_pedersen_commit          (scalar_t rped_commitment, const scalar_t s_exp, const scalar_t t_exp, const ring_pedersen_public_t *rped_pub);
 
 
 #endif

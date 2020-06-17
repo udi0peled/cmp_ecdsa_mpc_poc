@@ -37,8 +37,6 @@ void printECPOINT(const char * prefix, const EC_POINT *p, const EC_GROUP *ec, co
     printHexBytes("point(0x", p_bytes+1, (p_byte_len-1)/2, ",", 0);
     printHexBytes("0x", p_bytes + (p_byte_len +1)/2, (p_byte_len-1)/2, ")", 0);
     printf("%s", suffix);
-    
-    //printHexBytes(prefix, p_bytes, p_byte_len, suffix, 0);
   }
   else
   {

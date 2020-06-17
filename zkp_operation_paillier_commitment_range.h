@@ -1,11 +1,23 @@
-#include "zkp_common.h"
+/** 
+ *  Name:
+ *  zkp_operation_paillier_commitment_range
+ *  
+ *  Description:
+ *  Paillier Homomorphic Operation against Group Element with Exponent in Range Zero Knoeledge Proof.
+ * 
+ *  Usage:
+ *  Constructor and destructor for zkp_<...>_t don't set any values and handles only proof fields.
+ *  When using <...>_prove, all public and secret fields of zkp_<...>_t needs to be already populated (externally).
+ *  Calling <...>_prove sets only the proof fields.
+ *  When using <...>_verify, all public and proof fields of zkp_<...>_t need to be already populated.
+ *  Calling <...>_verify return 0/1 (fail/pass).
+ * 
+ */
 
 #ifndef __CMP20_ECDSA_MPC_ZKP_OPERATION_VS_PAILLIER_H__
 #define __CMP20_ECDSA_MPC_ZKP_OPERATION_VS_PAILLIER_H__
 
-/** 
- *  Paillier Affine Operation with Paillier Commitment in Range ZKProof 
- */
+#include "zkp_common.h"
 
 typedef struct
 {

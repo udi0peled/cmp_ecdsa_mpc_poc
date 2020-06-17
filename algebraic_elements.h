@@ -1,10 +1,28 @@
+/**
+ * 
+ *  Name:
+ *  algebraic_elements
+ * 
+ *  Description: 
+ *  Working with basic algebraic elements: elliptic curve groups (multiplicative notation), ec group elements and modulus ring scalars.
+ *  Most functions are just simple wrappers of corresponding openssl functions.
+ *  Some functions are a bit more then a wrapper to openssl, and handle parameters in more care, e.g.:
+ *  scalar_exp which supports negative exponenet (as opposed to openssl), and group_operation which allows for NULL parameters (see below).
+ * 
+ *  Usage:
+ *  All three types (ec_group_t, gr_elem_t, scalar_t) have constructures/destructures <...>_new and <...>_free. Freeing NULL doesn't do anything.
+ *  All scalars (especially in modulus ring) are returned as non-negative, aside from the functions scalar_negate and scalar_make_plus_minus.
+ *  In <...>_to_bytes functions, if byte_len is bigger then needed bytes for element encoding, bytes buffer is padded with zeros. If smaller, nothing is changed.
+ * 
+ */
+
+#ifndef __CMP20_ECDSA_MPC_ALGEBRAIC_ELEMENTS_H__
+#define __CMP20_ECDSA_MPC_ALGEBRAIC_ELEMENTS_H__
+
 #include <stdint.h>
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/objects.h>
-
-#ifndef __CMP20_ECDSA_MPC_ALGEBRAIC_ELEMENTS_H__
-#define __CMP20_ECDSA_MPC_ALGEBRAIC_ELEMENTS_H__
 
 #define GROUP_ID NID_secp256k1
 #define GROUP_ORDER_BYTES 32
@@ -16,10 +34,11 @@ typedef BIGNUM *scalar_t;
 
 scalar_t  scalar_new               ();
 void      scalar_free              (scalar_t num);
-void      scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const scalar_t num);
 void      scalar_copy              (scalar_t copy, const scalar_t num);
-void      scalar_set_word          (scalar_t num, unsigned long val);
+void      scalar_set_ul            (scalar_t num, unsigned long val);
+void      scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
 void      scalar_set_power_of_2    (scalar_t num, uint64_t two_exp);
+void      scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const scalar_t num);
 int       scalar_equal             (const scalar_t a, const scalar_t b);
 int       scalar_bitlength         (const scalar_t a);
 void      scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
@@ -28,23 +47,26 @@ void      scalar_negate            (scalar_t result, const scalar_t num);
 void      scalar_complement        (scalar_t result, const scalar_t num, const scalar_t modulus);
 void      scalar_mul               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
 void      scalar_inv               (scalar_t result, const scalar_t num, const scalar_t modulus);
+// Computes base^exp (mod modulus), supports exp negative coprime to modulus (fails if not coprime). 
 void      scalar_exp               (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus);
-void      scalar_make_plus_minus   (scalar_t num, const scalar_t num_range);
-void      scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
+// Convert num (after modulus) from range  [0 ... modulus) to [-modulus/2 ... modulus/2)
+void      scalar_make_plus_minus   (scalar_t num, const scalar_t modulus);
+// Sample exact bit-length safe prime
 void      sample_safe_prime        (scalar_t prime, unsigned int bits);
 
 ec_group_t  ec_group_new        ();
 void        ec_group_free       (ec_group_t ec);
-scalar_t    ec_group_order      (ec_group_t ec);
-gr_elem_t   ec_group_generator  (ec_group_t ec);
+scalar_t    ec_group_order      (const ec_group_t ec);
+gr_elem_t   ec_group_generator  (const ec_group_t ec);
 
 gr_elem_t   group_elem_new      (const ec_group_t ec);
 void        group_elem_free     (gr_elem_t el);
-void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec);
 void        group_elem_copy     (gr_elem_t copy, const gr_elem_t el);
-void        group_operation     (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 int         group_elem_equal    (const gr_elem_t a, const gr_elem_t b, const ec_group_t ec);
 int         group_elem_is_ident (const gr_elem_t a, const ec_group_t ec);
 void        group_elem_get_x    (scalar_t x, const gr_elem_t a, const ec_group_t ec, scalar_t modulus);
+void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec);
+// Compute initial*(base^exp) in the group. base==NULL retuns identity element of the group. initial==NULL used as identity. exp==NULL used as 1.
+void        group_operation     (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 
 #endif

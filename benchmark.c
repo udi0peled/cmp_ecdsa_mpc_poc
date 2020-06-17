@@ -28,18 +28,18 @@ void time_sampling_scalars(uint64_t reps, const scalar_t range, int coprime)
   printf("# sampling scalars (coprime: %d)\n%lu repetitions, time: %lu msec, avg: %f msec\n", coprime, reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
 }
 
-void time_paillier_generate_keys(uint64_t reps)
+void time_paillier_generate_keys(uint64_t reps, uint64_t paillier_modulus_bits)
 {
-  paillier_private_key_t priv;
+  paillier_private_key_t *priv;
   int priv_prime_bits = 0;
 
   start = clock();  
 
   for (uint64_t i = 0; i < reps; ++i)
   {
-    paillier_encryption_generate_key(&priv);
-    priv_prime_bits = BN_num_bits(priv.p);
-    paillier_encryption_free_keys(&priv, NULL);
+    priv = paillier_encryption_generate_key(paillier_modulus_bits/2);
+    priv_prime_bits = BN_num_bits(priv->p);
+    paillier_encryption_free_keys(priv, NULL);
   }
 
   diff = clock() - start;
@@ -172,7 +172,7 @@ int main()
   
   start = clock();
   
-  paillier_private_key_t *priv = paillier_encryption_generate_key();
+  paillier_private_key_t *priv = paillier_encryption_generate_key(4*PAILLIER_MODULUS_BYTES);
 
   diff = clock() - start;
 

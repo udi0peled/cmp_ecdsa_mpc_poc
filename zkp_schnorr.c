@@ -1,10 +1,11 @@
 #include "zkp_schnorr.h"
 
+// Only allocates (and later frees) proof fields, all other are assumed to be populated externally
 zkp_schnorr_t *zkp_schnorr_new()
 {
   zkp_schnorr_t *zkp = malloc(sizeof(*zkp));
   
-  zkp->proof.A = NULL;            // Group elements are created when proving
+  zkp->proof.A = NULL;            // group elements are created when proving
   zkp->proof.z = scalar_new();
 
   return zkp;
@@ -21,7 +22,7 @@ void zkp_schnorr_free (zkp_schnorr_t *zkp)
 
 void zkp_schnorr_commit (zkp_schnorr_t *zkp, scalar_t alpha)
 {
-  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);      // group elements are allocated while proving/commiting
 
   scalar_sample_in_range(alpha, ec_group_order(zkp->public.G), 0);
   group_operation(zkp->proof.A, NULL, zkp->public.g, alpha, zkp->public.G);
@@ -50,8 +51,8 @@ void zkp_schnorr_prove (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux, const sca
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   scalar_t e = scalar_new();
 
-  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);
-  EC_POINT_mul(zkp->public.G, zkp->proof.A, NULL, zkp->public.g, alpha, bn_ctx);
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);             // group elements are allocated while proving
+  group_operation(zkp->proof.A, NULL, zkp->public.g, alpha, zkp->public.G);
 
   zkp_schnoor_challenge(e, zkp, aux);
 

@@ -10,21 +10,23 @@
 #define FS_HALF 32      // Half of SHA512 64 bytes digest
 
 /** 
- *  Denote hash digest as 2 equal length parts (LH, RH) - together (LH,RH,data) is curr_digest.
+ *  Denote hash digest as 2 equal length (FS_HALF) parts (LH, RH).
+ *  Together (LH,RH,data) is curr_digest.
  *  Iteratively Hash (RH,data) to get next Hash digest (LH,RH).
- *  Concatenate all LH of iterations to digest, until getting required digest_len bytes.
- *  Initialize first RH to given state, and final RH returned at state - which allows for future calls on same data, getting new digests
+ *  Concatenate LH from all iterations to combined digest, until getting at least required digest_len bytes.
+ *  Initialize first RH to given state, and final RH returned at state - which allows for future calls on same data, getting new digests by continuing the final state.
  */
 
 static void fiat_shamir_bytes_from_state(uint8_t *digest, uint64_t digest_len, const uint8_t *data, uint64_t data_len, uint8_t state[FS_HALF])
 { 
-  // Initialize RH to state, so the first hash will be on (state, data).
+  // Initialize RH to state, so the first hash will operate on (state, data).
   uint8_t *curr_digest = malloc(2*FS_HALF + data_len);
   memcpy(curr_digest + FS_HALF, state, FS_HALF);
   memcpy(curr_digest + 2*FS_HALF, data, data_len);
 
   uint64_t add_curr_digest_bytes;
 
+  // Continue until remaining needed digest length is 0
   while (digest_len > 0)
   {  
     // hash previous (RH,data) to get new (LH, RH)
@@ -47,14 +49,15 @@ static void fiat_shamir_bytes_from_state(uint8_t *digest, uint64_t digest_len, c
 
 void fiat_shamir_bytes(uint8_t *digest, uint64_t digest_len, const uint8_t *data, uint64_t data_len)
 {
-  uint8_t initial_zero_state[FS_HALF] = {0};
-  fiat_shamir_bytes_from_state(digest, digest_len, data, data_len, initial_zero_state);
-  memset(initial_zero_state, 0, FS_HALF);
+  // Start from default (agreed upon) state of all zeros
+  uint8_t fs_state[FS_HALF] = {0};
+  fiat_shamir_bytes_from_state(digest, digest_len, data, data_len, fs_state);
+  memset(fs_state, 0, FS_HALF);
 }
 
 /** 
  *  Get num_res scalars from fiat-shamir on data.
- *  Rejection sampling each scalar until fits in given range.
+ *  Rejection sampling each scalar until fits in given range (to get pseudo-uniform values)
  */
 
 void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const scalar_t range, const uint8_t *data, uint64_t data_len)
@@ -62,6 +65,7 @@ void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const sca
   uint64_t num_bits = BN_num_bits(range);
   uint64_t num_bytes = BN_num_bytes(range);
 
+  // Start from default (agreed upon) state of all zeros
   uint8_t fs_state[FS_HALF] = {0};
   uint8_t *result_bytes = calloc(num_bytes, 1);
 
@@ -69,10 +73,13 @@ void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const sca
   {
     BN_copy(results[i_res], range);
     
+    // Get fiat_shamir scalar (from bytes) which fits in range.
+    // If doesn't, get next "fresh" scalar continuing from last state.
     while (BN_cmp(results[i_res], range) != -1)
     {
       fiat_shamir_bytes_from_state(result_bytes, num_bytes, data, data_len, fs_state);
       BN_bin2bn(result_bytes, num_bytes, results[i_res]);
+      // Truncate irrelevant bits (w/o biasing distribution)
       BN_mask_bits(results[i_res], num_bits);
     }
   }
@@ -85,13 +92,12 @@ void fiat_shamir_scalars_in_range(scalar_t *results, uint64_t num_res, const sca
  *  Auxiliary Information Handling
  */
 
-zkp_aux_info_t *zkp_aux_info_new(uint64_t set_byte_len, const void *init_bytes, uint64_t init_byte_len)
+zkp_aux_info_t *zkp_aux_info_new (uint64_t init_byte_len, const void *init_bytes)
 {
   zkp_aux_info_t *aux = malloc(sizeof(*aux));
   
-  set_byte_len = (set_byte_len >= init_byte_len ? set_byte_len : init_byte_len);
-  aux->info = malloc(set_byte_len);
-  aux->info_len = set_byte_len;
+  aux->info = calloc(init_byte_len, 1);
+  aux->info_len = init_byte_len;
 
   if (init_bytes) memcpy(aux->info, init_bytes, init_byte_len);
 
@@ -102,6 +108,7 @@ void zkp_aux_info_update(zkp_aux_info_t *aux, uint64_t at_pos, const void *updat
 {
   uint64_t new_len = at_pos + update_byte_len;
   
+  // Extend to new length, set with zeros
   if (new_len > aux->info_len)
   {
     aux->info = realloc(aux->info, new_len);
@@ -115,8 +122,8 @@ void zkp_aux_info_update(zkp_aux_info_t *aux, uint64_t at_pos, const void *updat
   }
   else
   {
+    // If no bytes to update, extend/truncate to new length (zero already set above if extended).
     aux->info = realloc(aux->info, new_len);
-    memset(aux->info + new_len, 0x00, aux->info_len - new_len);
     aux->info_len = new_len;
   }
 }

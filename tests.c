@@ -1,6 +1,6 @@
+#include <openssl/rand.h>
 #include "tests.h"
 #include "cmp_ecdsa_protocol.h"
-#include <openssl/rand.h>
 
 void test_scalars(const scalar_t range, uint64_t range_byte_len)
 {
@@ -341,7 +341,7 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
   zkp_encryption_in_range_free(zkp);
 }
 
-#define NUM_PARTIES 3
+#define NUM_PARTIES 2
 
 void execute_key_generation (cmp_party_t *parties[])
 {
@@ -431,7 +431,7 @@ void execute_signing (cmp_party_t *parties[])
   scalar_t sigma = scalar_new();
   
   scalar_sample_in_range(msg, parties[0]->ec_order, 0);
-  scalar_set_word(s, 0);
+  scalar_set_ul(s, 0);
   for (uint64_t i = 0; i < NUM_PARTIES; ++i)
   {
     r[i] = scalar_new();
@@ -460,13 +460,15 @@ void execute_signing (cmp_party_t *parties[])
   group_elem_free(pubkey);
 }
 
-
 void test_protocol()
 {
   hash_chunk  sid = "Fireblocks";
-  uint64_t    party_ids[NUM_PARTIES] = {333, 111, 222};
+  uint64_t    party_ids[NUM_PARTIES];
   cmp_party_t *parties[NUM_PARTIES];
 
+  // Initialize party ids
+  for (uint64_t i = 0; i < NUM_PARTIES; ++i) party_ids[i] = 111*i;
+  
   // Initialize Parties
   for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_new(parties, NUM_PARTIES, party_ids, i, sid);
 

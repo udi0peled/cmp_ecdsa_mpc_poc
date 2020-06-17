@@ -38,13 +38,13 @@ void  zkp_paillier_blum_free (zkp_paillier_blum_modulus_t *zkp)
 
 void  zkp_paillier_blum_challenge (scalar_t y[STATISTICAL_SECURITY], zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux)
 {
-    // Fiat-Shamir on paillier_pub_N
-
+  // Fiat-Shamir on (paillier_pub_N, w).
+  
   uint64_t fs_data_len = aux->info_len + 2*PAILLIER_MODULUS_BYTES;
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                               data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);                             data_pos += aux->info_len;
 
   scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->public->N);        data_pos += PAILLIER_MODULUS_BYTES;
   scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->proof.w);          data_pos += PAILLIER_MODULUS_BYTES;
@@ -59,6 +59,8 @@ void  zkp_paillier_blum_challenge (scalar_t y[STATISTICAL_SECURITY], zkp_paillie
 
 void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux)
 {
+  assert(BN_num_bytes(zkp->public->N) == PAILLIER_MODULUS_BYTES);
+
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
   // Generate w with (-1, 1) Jacobi signs wrt (p,q) by CRT
@@ -163,7 +165,7 @@ int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_
 
   // Check composite odd number of required byte-length
   int is_verified = BN_is_odd(zkp->public->N);
-  is_verified &= BN_num_bytes(zkp->public->N) == PAILLIER_MODULUS_BYTES;
+  is_verified &= (uint64_t) BN_num_bytes(zkp->public->N) == PAILLIER_MODULUS_BYTES;
   is_verified &= BN_is_prime_ex(zkp->public->N, 128, bn_ctx, NULL) == 0;
 
   scalar_t y[STATISTICAL_SECURITY];

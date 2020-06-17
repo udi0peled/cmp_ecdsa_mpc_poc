@@ -1,10 +1,10 @@
 #include "algebraic_elements.h"
 #include <openssl/rand.h>
 
-scalar_t  scalar_new  ()                                  { return BN_secure_new(); }
-void      scalar_free (scalar_t num)                      { BN_clear_free(num); }
-void      scalar_copy (scalar_t copy, const scalar_t num) { BN_copy(copy, num); }
-void      scalar_set_word  (scalar_t num, unsigned long val)   { BN_set_word(num, val); }
+scalar_t  scalar_new    ()                                  { return BN_secure_new(); }
+void      scalar_free   (scalar_t num)                      { BN_clear_free(num); }
+void      scalar_copy   (scalar_t copy, const scalar_t num) { BN_copy(copy, num); }
+void      scalar_set_ul (scalar_t num, unsigned long val)   { BN_set_word(num, val); }
 
 void scalar_set_power_of_2 (scalar_t num, uint64_t two_exp)
 {
@@ -14,8 +14,7 @@ void scalar_set_power_of_2 (scalar_t num, uint64_t two_exp)
 
 void scalar_to_bytes(uint8_t *bytes, uint64_t byte_len, const scalar_t num)
 {
-  if (byte_len >= (uint64_t) BN_num_bytes(num))
-    BN_bn2binpad(num, bytes, byte_len);
+  BN_bn2binpad(num, bytes, byte_len);
 }
 
 void scalar_add (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
@@ -66,7 +65,7 @@ void scalar_exp (scalar_t result, const scalar_t base, const scalar_t exp, const
   
   scalar_t res = scalar_new();
   
-  // if exp negative, it ignores and uses positive
+  // If exp negative, it ignores and uses positive, and invert result (fail if result isn't coprime to modulus)
   BN_mod_exp(res, base, exp, modulus, bn_ctx);
   if (BN_is_negative(exp)) BN_mod_inverse(res, res, modulus, bn_ctx);
 
@@ -86,12 +85,17 @@ int scalar_bitlength (const scalar_t a)
   return BN_num_bits(a);
 }
 
-void scalar_make_plus_minus(scalar_t num, const scalar_t num_range)
+void scalar_make_plus_minus(scalar_t num, const scalar_t modulus)
 {
-  scalar_t half_range = BN_dup(num_range);
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  
+  scalar_t half_range = BN_dup(modulus);
   BN_div_word(half_range, 2);
-  if (BN_cmp(num, half_range) > 0) BN_sub(num, num, num_range);
+  BN_mod(num, num, modulus, bn_ctx);
+  if (BN_cmp(num, half_range) >= 0) BN_sub(num, num, modulus);
+  
   scalar_free(half_range);
+  BN_CTX_free(bn_ctx);
 }
 
 void scalar_sample_in_range(scalar_t rnd, const scalar_t range_mod, int coprime)
@@ -127,8 +131,8 @@ void sample_safe_prime(scalar_t prime, unsigned int bits)
 
 ec_group_t  ec_group_new        ()                    { return EC_GROUP_new_by_curve_name(GROUP_ID); }
 void        ec_group_free       (ec_group_t ec)       { EC_GROUP_free(ec); }
-scalar_t    ec_group_order      (ec_group_t ec)       { return (scalar_t) EC_GROUP_get0_order(ec); }
-gr_elem_t   ec_group_generator  (ec_group_t ec)       { return (gr_elem_t) EC_GROUP_get0_generator(ec); }
+scalar_t    ec_group_order      (const ec_group_t ec) { return (scalar_t) EC_GROUP_get0_order(ec); }
+gr_elem_t   ec_group_generator  (const ec_group_t ec) { return (gr_elem_t) EC_GROUP_get0_generator(ec); }
 
 /**
  *  Group Elements
@@ -150,7 +154,7 @@ void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el
  */
 void group_operation (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec)
 {
-  if (!base)
+  if (!base) 
   {
     EC_POINT_set_to_infinity(ec, result);
     return;
@@ -158,22 +162,23 @@ void group_operation (gr_elem_t result, const gr_elem_t initial, const gr_elem_t
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   
-  if (initial)
+  if (!initial)
   {
-    if (exp) {
+    EC_POINT_mul(ec, result, NULL, base, exp, bn_ctx);
+  }
+  else  // initial and base are set
+  {
+    if (!exp)
+    {
+      EC_POINT_add(ec, result, initial, base, bn_ctx);
+    }
+    else // exp also set
+    {
       gr_elem_t temp_res = group_elem_new(ec);
       EC_POINT_mul(ec, temp_res, NULL, base, exp, bn_ctx);
       EC_POINT_add(ec, result, initial, temp_res, bn_ctx);
       group_elem_free(temp_res);
     }
-    else
-    {
-      EC_POINT_add(ec, result, initial, base, bn_ctx);
-    }
-  }
-  else
-  {
-    EC_POINT_mul(ec, result, NULL, base, exp, bn_ctx);
   }
   
   BN_CTX_free(bn_ctx);

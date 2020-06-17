@@ -1,6 +1,6 @@
 #include "paillier_cryptosystem.h"
 
-paillier_private_key_t *paillier_encryption_generate_key ()
+paillier_private_key_t *paillier_encryption_generate_key (uint64_t prime_bits)
 {
   paillier_private_key_t *priv = malloc(sizeof(*priv));
 
@@ -9,12 +9,12 @@ paillier_private_key_t *paillier_encryption_generate_key ()
   priv->p       = scalar_new();
   priv->q       = scalar_new();
   priv->mu      = scalar_new();
-  priv->phi_N  = scalar_new();
+  priv->phi_N   = scalar_new();
   priv->pub.N   = scalar_new();
   priv->pub.N2  = scalar_new();
 
-  sample_safe_prime(priv->p, 4*PAILLIER_MODULUS_BYTES);
-  sample_safe_prime(priv->q, 4*PAILLIER_MODULUS_BYTES);
+  sample_safe_prime(priv->p, prime_bits);
+  sample_safe_prime(priv->q, prime_bits);
 
   BN_mul(priv->pub.N, priv->p, priv->q, bn_ctx);
   BN_sqr(priv->pub.N2, priv->pub.N, bn_ctx);
@@ -124,6 +124,7 @@ void paillier_encryption_homomorphic (scalar_t new_cipher, const scalar_t cipher
 
   if (factor)
   {
+    // If exp negative, it ignores and uses positive, and invert result (fail if result isn't coprime to modulus)
     BN_mod_exp(res_new_cipher, res_new_cipher, factor, pub->N2, bn_ctx);
     if (BN_is_negative(factor)) BN_mod_inverse(res_new_cipher, res_new_cipher, pub->N2, bn_ctx);
   }

@@ -5,11 +5,11 @@
   "tasks": [
     {
       "type": "shell",
-      "label": "make nikmak ecdsa mpc poc",
+      "label": "make cmp ecdsa mpc poc",
       "command": "make",
       "args": [],
       "options": {
-        "cwd": "/home/udi/Fireblocks/Dev/nikmak_ecdsa_mpc_poc"
+        "cwd": "/home/udi/Fireblocks/Dev/cmp_ecdsa_mpc_poc"
       },
       "presentation": {
         "echo": true,

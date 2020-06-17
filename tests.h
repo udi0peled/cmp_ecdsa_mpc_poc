@@ -1,3 +1,16 @@
+/**
+ * 
+ *  Name:
+ *  tests
+ *  
+ *  Description:
+ *  Test all primitives and the CMP protocol itself
+ * 
+ *  Usage:
+ *  For testing the protocol, number of parties is currently hardcoded as NUM_PARTIES.
+ * 
+ */
+
 #include "common.h"
 #include "primitives.h"
 

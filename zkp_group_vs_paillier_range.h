@@ -1,11 +1,24 @@
-#include "zkp_common.h"
+/**
+ * 
+ *  Name:
+ *  zkp_group_vs_paillier_range
+ *  
+ *  Description:
+ *  Group Element vs Paillier Paillier Encryption in Range Zero Knowledge Proof
+ * 
+ *  Usage:
+ *  Constructor and destructor for zkp_<...>_t don't set any values and handles only proof fields.
+ *  When using <...>_prove, all public and secret fields of zkp_<...>_t needs to be already populated (externally).
+ *  Calling <...>_prove sets only the proof fields.
+ *  When using <...>_verify, all public and proof fields of zkp_<...>_t need to be already populated.
+ *  Calling <...>_verify return 0/1 (fail/pass).
+ * 
+ */
 
 #ifndef __CMP20_ECDSA_MPC_ZKP_GROUP_VS_PAILLIER_H__
 #define __CMP20_ECDSA_MPC_ZKP_GROUP_VS_PAILLIER_H__
 
-/** 
- *  Group Element vs Paillier Paillier Encryption in Range ZKProof 
- */
+#include "zkp_common.h"
 
 typedef struct
 {

@@ -137,7 +137,7 @@ void cmp_key_generation_init(cmp_party_t *party)
 
   kgd->tau = scalar_new();
   kgd->psi = zkp_schnorr_new();
-  kgd->aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL, 0); // prepeare for (sid_hash, i, srid)
+  kgd->aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL); // prepeare for (sid_hash, i, srid)
 
   kgd->run_time = 0;
 }
@@ -343,7 +343,7 @@ void cmp_refresh_aux_info_init(cmp_party_t *party)
   reda->psi_rped = zkp_ring_pedersen_param_new();
   reda->psi_sch  = calloc(party->num_parties, sizeof(zkp_schnorr_t)); 
   reda->tau      = calloc(party->num_parties, sizeof(scalar_t));
-  reda->aux      = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL, 0);   // prepare for (sid, i, rho)
+  reda->aux      = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);   // prepare for (sid, i, rho)
   
   reda->reshare_secret_x_j = calloc(party->num_parties, sizeof(scalar_t));
   reda->encrypted_reshare_j = calloc(party->num_parties, sizeof(scalar_t));
@@ -435,7 +435,7 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
 
   cmp_refresh_aux_info_t *reda = party->refresh_data;
 
-  reda->paillier_priv = paillier_encryption_generate_key();
+  reda->paillier_priv = paillier_encryption_generate_key(4*PAILLIER_MODULUS_BYTES);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->prime_time = time_diff;
@@ -444,7 +444,7 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
   reda->rped_priv = ring_pedersen_generate_param(reda->paillier_priv->p, reda->paillier_priv->q);
   
   // Sample other parties' reshares, set negative of sum for current
-  scalar_set_word(reda->reshare_secret_x_j[party->index], 0);
+  scalar_set_ul(reda->reshare_secret_x_j[party->index], 0);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     // Also initialize relevant zkp
@@ -736,7 +736,7 @@ void cmp_presigning_init(cmp_party_t *party)
   preda->psi_logG = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
   preda->psi_logK = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
 
-  preda->aux      = zkp_aux_info_new(sizeof(hash_chunk) + sizeof(uint64_t), NULL, 0);      // Prepate for (sid_hash, i);
+  preda->aux      = zkp_aux_info_new(sizeof(hash_chunk) + sizeof(uint64_t), NULL);      // Prepate for (sid_hash, i);
   
   for (uint64_t j = 0; j < party->num_parties; ++j){
     preda->alpha_j[j]    = scalar_new();
@@ -1035,8 +1035,8 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   free(verified_psi_affg);
   free(verified_psi_logG);
 
-  group_elem_copy(preda->combined_Gamma, party->parties[0]->presigning_data->Gamma);
-  for (uint64_t i = 1; i < party->num_parties; ++i) 
+  group_operation(preda->combined_Gamma, NULL, NULL, NULL, party->ec);
+  for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
     group_operation(preda->combined_Gamma, preda->combined_Gamma, party->parties[i]->presigning_data->Gamma, NULL, party->ec);
   }
@@ -1117,9 +1117,9 @@ void  cmp_presigning_final_exec (cmp_party_t *party)
   gr_elem_t gen_to_delta = group_elem_new(party->ec);
   gr_elem_t combined_Delta = group_elem_new(party->ec);
   
-  scalar_copy(combined_delta, party->parties[0]->presigning_data->delta);
-  group_elem_copy(combined_Delta, party->parties[0]->presigning_data->Delta);
-  for (uint64_t i = 1; i < party->num_parties; ++i) 
+  scalar_set_ul(combined_delta, 0);
+  group_operation(combined_Delta, NULL, NULL, NULL, party->ec);
+  for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
     scalar_add(combined_delta, combined_delta, party->parties[i]->presigning_data->delta, party->ec_order);
     group_operation(combined_Delta, combined_Delta, party->parties[i]->presigning_data->Delta, NULL, party->ec);

@@ -5,13 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "make and debug nikmak ecdsa mpc poc",
+      "name": "make and debug cmp ecdsa mpc poc",
       "type": "cppdbg",
       "request": "launch",
-      "program": "/home/udi/Fireblocks/Dev/nikmak_ecdsa_mpc_poc/benchmark",
+      "program": "/home/udi/Fireblocks/Dev/cmp_ecdsa_mpc_poc/benchmark",
       "args": [],
       "stopAtEntry": false,
-      "cwd": "/home/udi/Fireblocks/Dev/nikmak_ecdsa_mpc_poc",
+      "cwd": "/home/udi/Fireblocks/Dev/cmp_ecdsa_mpc_poc",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
@@ -22,7 +22,7 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "make nikmak ecdsa mpc poc",
+      "preLaunchTask": "make cmp ecdsa mpc poc",
       "miDebuggerPath": "/usr/bin/gdb"
     }
   ]

@@ -28,7 +28,7 @@ void zkp_ring_pedersen_param_free (zkp_ring_pedersen_param_t *zkp)
 
 void  zkp_ring_pedersen_param_challenge (uint8_t e[STATISTICAL_SECURITY], zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux)
 {
-  // Fiat-Shamir on rped_N_s_t, A[...]
+  // Fiat-Shamir on (N modulus, s, t, all A).
 
   uint64_t fs_data_len = aux->info_len + (STATISTICAL_SECURITY + 3) * RING_PED_MODULUS_BYTES;
   uint8_t *fs_data = malloc(fs_data_len);
@@ -53,16 +53,18 @@ void  zkp_ring_pedersen_param_challenge (uint8_t e[STATISTICAL_SECURITY], zkp_ri
 
 void  zkp_ring_pedersen_param_prove (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux)
 {
+  assert(BN_num_bytes(zkp->rped_pub->N) == RING_PED_MODULUS_BYTES);
+  
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
-  // sample initial a_i in z_i, so later will just add e_i*lam
+  // Sample initial a_i as z_i (and computie commitment A[i]), so later will just add e_i*lam for final z_i.
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
   {
     scalar_sample_in_range(zkp->proof.z[i], zkp->secret->phi_N, 0);
     BN_mod_exp(zkp->proof.A[i], zkp->rped_pub->t, zkp->proof.z[i], zkp->rped_pub->N, bn_ctx);
   }
 
-  uint8_t e[STATISTICAL_SECURITY];
+  uint8_t e[STATISTICAL_SECURITY];                  // coin flips by LSB
   zkp_ring_pedersen_param_challenge(e, zkp, aux);
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
@@ -84,7 +86,7 @@ int   zkp_ring_pedersen_param_verify (zkp_ring_pedersen_param_t *zkp, const zkp_
   scalar_t rhs_value = scalar_new();
   scalar_t temp;
 
-  int is_verified = 1;
+  int is_verified = BN_num_bytes(zkp->rped_pub->N) == RING_PED_MODULUS_BYTES;
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
   {

@@ -3,14 +3,12 @@
 
 ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const scalar_t q)
 {
-  assert((BN_num_bytes(p) == RING_PED_MODULUS_BYTES/2) && (BN_num_bytes(q) == RING_PED_MODULUS_BYTES/2));
-  
   ring_pedersen_private_t *priv = malloc(sizeof(*priv));
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   
   priv->phi_N = scalar_new();
-  priv->lam = scalar_new();
+  priv->lam   = scalar_new();
   priv->pub.N = scalar_new();
   priv->pub.s = scalar_new();
   priv->pub.t = scalar_new();
@@ -27,8 +25,8 @@ ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const 
   scalar_sample_in_range(r, priv->pub.N, 1);
   BN_mod_mul(priv->pub.t, r, r, priv->pub.N, bn_ctx);
   BN_mod_exp(priv->pub.s, priv->pub.t, priv->lam, priv->pub.N, bn_ctx);
-
   scalar_free(r);
+  
   BN_CTX_free(bn_ctx);
 
   return priv;
