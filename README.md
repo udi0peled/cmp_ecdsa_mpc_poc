@@ -32,6 +32,12 @@ For more information consult the relevant h file
 **algebraic_elements:**
 An OpenSSL wrapper of basic algebraic functionalities.
 
+**paillier_cryptosystem:**
+Paillier cryptosystem operations: key generation, encrypting, decrypting and homomorphic evaluation.
+
+**ring_pedersen_parameters:**
+Ring pedersen evaluation: key generation and commiting.
+
 **zkp_<...>:**
 Zero knowledge proof of relevant claim. Allows proving and verifying claims, and for Schnorr proof also commiting before proving.
 
