@@ -341,34 +341,38 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
   zkp_encryption_in_range_free(zkp);
 }
 
-#define NUM_PARTIES 2
+/**
+ * 
+ *  Protocol Tests
+ *
+ */
 
-void execute_key_generation (cmp_party_t *parties[])
+void execute_key_generation (cmp_party_t *parties[], uint64_t num_parties)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_init(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_final_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_key_generation_clean(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_init(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_1_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_2_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_3_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_final_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_clean(parties[i]);
 }
 
-void execute_refresh_and_aux_info (cmp_party_t *parties[])
+void execute_refresh_and_aux_info (cmp_party_t *parties[], uint64_t num_parties)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_init(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_final_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_refresh_aux_info_clean(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_init(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_1_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_2_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_3_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_final_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_clean(parties[i]);
 }
 
-void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[])
+void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[], uint64_t num_parties)
 {
-  gr_elem_t *pub = calloc(NUM_PARTIES, sizeof(gr_elem_t));
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  gr_elem_t *pub = calloc(num_parties, sizeof(gr_elem_t));
+  for (uint64_t i = 0; i < num_parties; ++i)
   {
     pub[i] = group_elem_new(parties[i]->ec);
     group_elem_copy(pub[i], parties[i]->public_X[0]);
@@ -380,19 +384,19 @@ void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[])
   }
   group_elem_copy(pubkey, pub[0]);
 
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) group_elem_free(pub[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) group_elem_free(pub[i]);
   free(pub);
 }
 
-void execute_presigning (cmp_party_t *parties[])
+void execute_presigning (cmp_party_t *parties[], uint64_t num_parties)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_init(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_final_exec(parties[i]);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_presigning_clean(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_init(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_1_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_2_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_3_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_final_exec(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_clean(parties[i]);
 }
 
 int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
@@ -422,9 +426,9 @@ int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, con
   return is_valid;
 }
 
-void execute_signing (cmp_party_t *parties[])
+void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
 {
-  scalar_t *r     = calloc(NUM_PARTIES, sizeof(scalar_t)); 
+  scalar_t *r     = calloc(num_parties, sizeof(scalar_t)); 
   
   scalar_t s     = scalar_new();
   scalar_t msg   = scalar_new();
@@ -432,7 +436,7 @@ void execute_signing (cmp_party_t *parties[])
   
   scalar_sample_in_range(msg, parties[0]->ec_order, 0);
   scalar_set_ul(s, 0);
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i)
+  for (uint64_t i = 0; i < num_parties; ++i)
   {
     r[i] = scalar_new();
     cmp_signature_share(r[i], sigma, parties[i], msg);
@@ -443,7 +447,7 @@ void execute_signing (cmp_party_t *parties[])
   // Validate Signature
   
   gr_elem_t pubkey = group_elem_new(parties[0]->ec);
-  get_public_key(pubkey, parties);
+  get_public_key(pubkey, parties, num_parties);
 
   printBIGNUM("msg = ", msg, "\n");
   printBIGNUM("r = ", r[0], "\n");
@@ -452,7 +456,7 @@ void execute_signing (cmp_party_t *parties[])
 
   assert(signature_verify(r[0], s, msg, pubkey));
 
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) scalar_free(r[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) scalar_free(r[i]);
   free(r);
   scalar_free(s);
   scalar_free(msg);
@@ -460,29 +464,33 @@ void execute_signing (cmp_party_t *parties[])
   group_elem_free(pubkey);
 }
 
-void test_protocol()
+int PRINT_VALUES;
+
+void test_protocol(uint64_t num_parties, int print_values)
 {
+  PRINT_VALUES = print_values;
+
   hash_chunk  sid = "Fireblocks";
-  uint64_t    party_ids[NUM_PARTIES];
-  cmp_party_t *parties[NUM_PARTIES];
+  uint64_t    *party_ids = calloc(num_parties, sizeof(uint64_t));
+  cmp_party_t **parties = calloc(num_parties, sizeof(cmp_party_t*));
 
   // Initialize party ids
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) party_ids[i] = 111*i;
+  for (uint64_t i = 0; i < num_parties; ++i) party_ids[i] = i;
   
   // Initialize Parties
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_new(parties, NUM_PARTIES, party_ids, i, sid);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_party_new(parties, num_parties, party_ids, i, sid);
 
   printf("\n\n# Key Generation\n\n");
-  execute_key_generation(parties);
+  execute_key_generation(parties, num_parties);
 
   printf("\n\n# Refrsh and Auxliarty Information\n\n");
-  execute_refresh_and_aux_info(parties);
+  execute_refresh_and_aux_info(parties, num_parties);
 
   printf("\n\n# Pre-Signing\n\n");
-  execute_presigning(parties);
+  execute_presigning(parties, num_parties);
 
-  printf("\n\n# Pre-Signing\n\n");
-  execute_signing(parties);
+  printf("\n\n# Signing\n\n");
+  execute_signing(parties, num_parties);
 
-  for (uint64_t i = 0; i < NUM_PARTIES; ++i) cmp_party_free(parties[i]);
+  for (uint64_t i = 0; i < num_parties; ++i) cmp_party_free(parties[i]);
 }

@@ -5,6 +5,8 @@
 #include <time.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
+extern int PRINT_VALUES;
+
 void cmp_sample_bytes (uint8_t *rand_bytes, uint64_t byte_len)
 {
   RAND_bytes(rand_bytes, byte_len);
@@ -198,6 +200,8 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   kgd->run_time += time_diff;
 
   printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + sizeof(hash_chunk), time_diff);
+  
+  if (!PRINT_VALUES) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("V_%lu = ", party->index); printHexBytes("0x", kgd->V, sizeof(hash_chunk), "\n", 0);
 }
@@ -220,6 +224,8 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
 
   printf("### Round 2. Party %lu publishes (sid, i, srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + 4*sizeof(hash_chunk) + 2*GROUP_ELEMENT_BYTES, time_diff);
+  
+  if (!PRINT_VALUES) return;
   printf("X_%lu = ", party->index); printECPOINT("", kgd->public_X, party->ec, "\n", 1);
   printf("A_%lu = ", party->index); printECPOINT("", kgd->psi->proof.A, party->ec, "\n", 1);
   printf("srid_%lu = ", party->index); printHexBytes("0x", kgd->srid, sizeof(hash_chunk), "\n", 0);
@@ -279,6 +285,8 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   kgd->run_time += time_diff;
   
   printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + zkp_schnorr_proof_bytes(), time_diff);
+
+  if (!PRINT_VALUES) return;
   printHexBytes("combined srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
 }
 
@@ -322,6 +330,8 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   
   printf("### Final. Party %lu stores (srid, all X, secret x_i).\t>>>\t%lu B, %lu ms\n", party->id, 
     sizeof(hash_chunk) + party->num_parties * GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES, time_diff);
+
+  if (!PRINT_VALUES) return;
   printf("x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
 }
 
@@ -469,6 +479,8 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
   reda->run_time += time_diff;
 
   printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms (gen N_i) + %lu ms (rest)\n", party->id, 2*sizeof(hash_chunk)+sizeof(uint64_t), reda->prime_time, time_diff);
+
+  if (!PRINT_VALUES) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("V_%lu = ", party->index); printHexBytes("0x", reda->V, sizeof(hash_chunk), "\n", 0);
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -496,6 +508,7 @@ void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
   printf("### Round 2. Party %lu publishes (sid, i, X_i^{1...n}, A_i^{1...n}, Paillier N_i, s_i, t_i, rho_i, u_i, echo_broadcast).\t>>>\t%lu B, %lu ms\n", 
     party->id, 2*sizeof(uint64_t) + party->num_parties*2*GROUP_ELEMENT_BYTES + 3*PAILLIER_MODULUS_BYTES + 3*sizeof(hash_chunk), time_diff);
   
+  if (!PRINT_VALUES) return;
   printf("echo_broadcast_%lu = ", party->index); printHexBytes("echo_broadcast = 0x", reda->echo_broadcast, sizeof(hash_chunk), "\n", 0);
   printf("rho_%lu = ", party->index); printHexBytes("0x", reda->rho, sizeof(hash_chunk), "\n", 0);
   printf("u_%lu = ", party->index); printHexBytes("0x", reda->u, sizeof(hash_chunk), "\n", 0);
@@ -597,6 +610,8 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   
   printf("### Round 3. Party %lu publishes (sid, i, psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + zkp_paillier_blum_proof_bytes() + zkp_ring_pedersen_param_proof_bytes() + (party->num_parties-1)*zkp_schnorr_proof_bytes() + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
+
+  if (!PRINT_VALUES) return;
   printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);
 }
 
@@ -687,6 +702,8 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   
   printf("### Final. Party %lu stores fresh (secret x_i, all public X, N_i, s_i, t_i).\t>>>\t%lu B, %lu ms\n", party->id, 
     party->num_parties * GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES + party->num_parties*3*PAILLIER_MODULUS_BYTES, time_diff);
+
+  if (!PRINT_VALUES) return;
   printf("fresh_x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
   for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
@@ -855,6 +872,8 @@ void cmp_presigning_round_1_exec (cmp_party_t *party)
 
   printf("### Round 1. Party %lu broadcasts (sid, i, K_i, G_i). Send (sid, i, psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id,
     2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * zkp_encryption_in_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES), time_diff);
+
+  if (!PRINT_VALUES) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("k_%lu = ", party->index); printBIGNUM("", preda->k, "\n");
   printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
@@ -994,6 +1013,7 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
     + zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES)
     + zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES)), time_diff);
   
+  if (!PRINT_VALUES) return;
   printf("Gamma_%lu = ", party->index); printECPOINT("", preda->Gamma, party->ec, "\n", 1);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1087,6 +1107,8 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   
   printf("### Round 3. Party %lu publishes (sid, i, delta_i, Delta_i, psi_logK_j)).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + (party->num_parties -1)*zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES), time_diff);
+
+  if (!PRINT_VALUES) return;
   printf("delta_%lu = ", party->index); printBIGNUM("", preda->delta, "\n");
   printf("Delta_%lu = ", party->index); printECPOINT("", preda->Delta, party->ec, "\n", 1);
 }
@@ -1144,6 +1166,8 @@ void  cmp_presigning_final_exec (cmp_party_t *party)
   
   printf("### Round 4. Party %lu stores (sid, i, R, k_i, chi_i).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + 2*GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES, time_diff);
+
+  if (!PRINT_VALUES) return;
   printf("R_%lu = ", party->index); printECPOINT("", party->R, party->ec, "\n", 1);  
   printf("k_%lu = ", party->index); printBIGNUM("", party->k, "\n");
   printf("chi_%lu = ", party->index); printBIGNUM("", party->chi, "\n");

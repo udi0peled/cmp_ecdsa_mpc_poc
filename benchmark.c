@@ -28,22 +28,25 @@ void time_sampling_scalars(uint64_t reps, const scalar_t range, int coprime)
   printf("# sampling scalars (coprime: %d)\n%lu repetitions, time: %lu msec, avg: %f msec\n", coprime, reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
 }
 
-void time_paillier_generate_keys(uint64_t reps, uint64_t paillier_modulus_bits)
+paillier_private_key_t *time_paillier_generate_keys(uint64_t paillier_modulus_bits)
 {
-  paillier_private_key_t *priv;
-  int priv_prime_bits = 0;
-
-  start = clock();  
-
-  for (uint64_t i = 0; i < reps; ++i)
-  {
-    priv = paillier_encryption_generate_key(paillier_modulus_bits/2);
-    priv_prime_bits = BN_num_bits(priv->p);
-    paillier_encryption_free_keys(priv, NULL);
-  }
+  start = clock();
+  
+  paillier_private_key_t *priv = paillier_encryption_generate_key(paillier_modulus_bits/2);
 
   diff = clock() - start;
-  printf("# generating paillier (%d-bits primes) safe keys\n%lu repetitions, time: %lu msec, avg: %f msec\n", priv_prime_bits, reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
+
+  printf("# paillier key\n");
+  printBIGNUM("p = ", (priv->p), "\n");
+  printBIGNUM("q = ", (priv->q), "\n");
+  printBIGNUM("paillier_phi_N = ", (priv->phi_N), "\n");
+  printBIGNUM("nmu = ", (priv->mu), "\n");
+  printBIGNUM("N = ", (priv->pub.N), "\n");
+  printBIGNUM("N2 = ", (priv->pub.N2), "\n");
+
+  printf("### generating single paillier (%d-bits primes) priv/pub key pair: %lu msec\n", BN_num_bits(priv->p), diff * 1000/ CLOCKS_PER_SEC);
+
+  return priv;
 }
 
 void time_hashing(uint64_t reps, const uint8_t* data, uint64_t data_len)
@@ -159,56 +162,83 @@ void time_bn_ctx(uint64_t reps)
   ec_group_free(ec);
 }
 
-int main()
+int main(int argc, char* argv[])
 { 
-  printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
-  printf("RING_PED_MODULUS_BYTES = %u\n", RING_PED_MODULUS_BYTES);
-  printf("ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES = %lu\n", zkp_paillier_blum_proof_bytes());
-  printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %lu\n", zkp_ring_pedersen_param_proof_bytes());
-  printf("ZKP_SCHNORR_PROOF_BYTES = %lu\n", zkp_schnorr_proof_bytes());
-  printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %lu\n", zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES));
-  printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
-  printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
-  
-  start = clock();
-  
-  paillier_private_key_t *priv = paillier_encryption_generate_key(4*PAILLIER_MODULUS_BYTES);
+  int print_values = 0;
+  uint64_t num_parties = 2;
+  uint64_t modulus_bits = 1024;
 
-  diff = clock() - start;
+  if (argc >= 2)
+  {
+    if (strcmp(argv[1], "cmp") == 0) 
+    {
+      // Testing the protocol 
 
-  printf("# paillier key\n");
-  printBIGNUM("p = ", (priv->p), "\n");
-  printBIGNUM("q = ", (priv->q), "\n");
-  printBIGNUM("paillier_phi_N = ", (priv->phi_N), "\n");
-  printBIGNUM("nmu = ", (priv->mu), "\n");
-  printBIGNUM("N = ", (priv->pub.N), "\n");
-  printBIGNUM("N2 = ", (priv->pub.N2), "\n");
+      if (argc >= 3)
+      {
+        num_parties = strtoul(argv[2], NULL, 10);
+        if (argc >= 4) print_values = strcmp(argv[3], "0") != 0;
+      }
 
-  printf("# generating single paillier (%d-bits primes) priv/pub key pair: %lu msec\n", BN_num_bits(priv->p), diff * 1000/ CLOCKS_PER_SEC);
+      printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
+      printf("RING_PED_MODULUS_BYTES = %u\n", RING_PED_MODULUS_BYTES);
+      printf("EPS_ZKP_SLACK_PARAMETER_BYTES = %u\n", EPS_ZKP_SLACK_PARAMETER_BYTES);
+      printf("ELL_ZKP_RANGE_PARAMETER_BYTES = %u\n", ELL_ZKP_RANGE_PARAMETER_BYTES);
+      printf("CALIGRAPHIC_I_ZKP_RANGE_BYTES = %u\n", CALIGRAPHIC_I_ZKP_RANGE_BYTES);
+      printf("CALIGRAPHIC_J_ZKP_RANGE_BYTES = %u\n", CALIGRAPHIC_J_ZKP_RANGE_BYTES);
+      // printf("ZKP_PAILLIER_BLUM_MODULUS_PROOF_BYTES = %lu\n", zkp_paillier_blum_proof_bytes());
+      // printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %lu\n", zkp_ring_pedersen_param_proof_bytes());
+      // printf("ZKP_SCHNORR_PROOF_BYTES = %lu\n", zkp_schnorr_proof_bytes());
+      // printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %lu\n", zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES));
+      // printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
+      // printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
 
-  // test_paillier_operations(priv);
+      printf("### Executing protocol for %lu parties\n", num_parties);
+      test_protocol(num_parties, print_values);
+      return 0;
+    }
+    else if (strcmp(argv[1], "paillier") == 0)
+    {
+      if (argc >= 3) modulus_bits = strtoul(argv[2], NULL, 10);
 
-  // time_paillier_encrypt(100, &priv->pub, 0, 0);
+      paillier_private_key_t *priv = time_paillier_generate_keys(modulus_bits);
 
-  // test_ring_pedersen(priv->p, priv->q);
+      test_paillier_operations(priv);
 
-  // test_fiat_shamir(100, 100);
+      // time_paillier_encrypt(100, &priv->pub, 0, 0);
 
-  //test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
-  //test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
-  // test_scalars(priv->pub.N2, 2*PAILLIER_MODULUS_BYTES);
+      // test_ring_pedersen(priv->p, priv->q);
 
-  //test_group_elements();
+      // test_fiat_shamir(100, 100);
 
-  //time_bn_ctx(1000);
+      //test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
+      //test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
+      // test_scalars(priv->pub.N2, 2*PAILLIER_MODULUS_BYTES);
 
-  ring_pedersen_private_t *rped_priv = ring_pedersen_generate_param(priv->p, priv->q);
-  // test_zkp_schnorr();
+      //test_group_elements();
 
-  // test_zkp_encryption_in_range(&priv->pub, &rped_priv->pub);
+      //time_bn_ctx(1000);
 
-  paillier_encryption_free_keys(priv, NULL);
-  ring_pedersen_free_param(rped_priv,NULL);
+      //ring_pedersen_private_t *rped_priv = ring_pedersen_generate_param(priv->p, priv->q);
+      // test_zkp_schnorr();
 
-  test_protocol();
+      // test_zkp_encryption_in_range(&priv->pub, &rped_priv->pub);
+
+      paillier_encryption_free_keys(priv, NULL);
+      //ring_pedersen_free_param(rped_priv,NULL);
+
+      return 0;
+    }
+    else if (strcmp(argv[2], "zkp") == 0)
+    {
+
+    }
+  }
+
+  printf("\nUsage options:\n");
+  printf("%s\n cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
+  printf("%s\n paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
+  //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
+
+  return 1;
 }
