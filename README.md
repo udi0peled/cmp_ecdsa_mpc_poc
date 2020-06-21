@@ -28,10 +28,13 @@ The ```print_value``` is either 0 or 1, specifing whether to print all values (s
 
 ### Code Design
 For more information consult the relevant h file
+
 **algebraic_elements:**
 An OpenSSL wrapper of basic algebraic functionalities.
+
 **zkp_<...>:**
 Zero knowledge proof of relevant claim. Allows proving and verifying claims, and for Schnorr proof also commiting before proving.
+
 **cmp_ecdsa_protocol:**
 All phases of the ECDSA protocol: key generation, refresh auxiliary information, pre-signing, signing.
 Each of the phases is implemented in a few rounds, except signing which is non-interactive.
