@@ -18,7 +18,7 @@ extern int PRINT_VALUES;
 
 #define COMM_CHNL_PATTERN "CHANNEL_%lu_to_%lu.dat"
 
-void cmp_comm_init(uint64_t num_parties)
+void cmp_comm_close(uint64_t num_parties)
 {
   char filename[sizeof(COMM_CHNL_PATTERN) + 8];
 

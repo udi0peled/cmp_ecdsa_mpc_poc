@@ -227,7 +227,7 @@ void cmp_presigning_final_exec   (cmp_party_t *party);
 
 void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, const scalar_t msg);
 
-void cmp_comm_init(uint64_t num_parties);
+void cmp_comm_close(uint64_t num_parties);
 void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *bytes, uint64_t byte_len);
 void cmp_comm_receive_bytes(uint64_t my_index, uint64_t to_index, uint8_t *bytes, uint64_t byte_len);
 

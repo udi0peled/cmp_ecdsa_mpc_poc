@@ -168,8 +168,6 @@ int main(int argc, char* argv[])
   uint64_t num_parties = 2;
   uint64_t modulus_bits = 1024;
 
-  cmp_comm_init(10);
-
   if (argc >= 2)
   {
     if (strcmp(argv[1], "cmp") == 0) 
@@ -251,8 +249,9 @@ int main(int argc, char* argv[])
       
       uint8_t buffer[3];
       cmp_comm_receive_bytes(from_index, to_index, buffer, sizeof(buffer));
-
       printHexBytes("read: ", buffer, 3, "\n", 0);
+
+      cmp_comm_close(5);
       return 0;
     }
     
