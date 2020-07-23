@@ -3,9 +3,95 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <time.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
 extern int PRINT_VALUES;
+
+/********************************************
+ *
+ *   Communication Channels
+ * 
+ ********************************************/
+
+#define COMM_CHNL_PATTERN "CHANNEL_%lu_to_%lu.dat"
+
+void cmp_comm_init(uint64_t num_parties)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+
+  for (uint64_t from_index = 0; from_index < num_parties; from_index++)
+  {
+    for (uint64_t to_index = 0; to_index < num_parties; to_index++)
+    {
+      sprintf(filename, COMM_CHNL_PATTERN, from_index, to_index);
+      remove(filename);
+    }
+  }
+}
+
+void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *bytes, uint64_t byte_len)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+  sprintf(filename, COMM_CHNL_PATTERN, my_index, to_index);
+
+  int fd;
+  fd = open(filename, O_RDWR | O_CREAT, 0666);
+
+  struct flock lock;
+  lock.l_type = F_WRLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0;
+  lock.l_pid = getpid();
+
+  fcntl(fd, F_SETLK, &lock);
+  write(fd, bytes, byte_len);
+
+  srand(time(0));
+  sleep(rand() % 5 + 1);
+
+  lock.l_type = F_UNLCK;
+  fcntl(fd, F_SETLK, &lock);
+  close(fd);
+}
+
+void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *bytes, uint64_t byte_len)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+  sprintf(filename, COMM_CHNL_PATTERN, from_index, my_index);
+
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = 1 << 25;
+
+  while (access(filename, F_OK ) == -1) nanosleep(&ts, NULL);
+
+  int fd;
+  fd = open(filename, O_RDWR, 0666);
+  
+  struct flock lock;
+  lock.l_type = F_RDLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0;
+  lock.l_pid = getpid();
+
+  fcntl(fd, F_SETLKW, &lock);
+  read(fd, bytes, byte_len);
+
+  lock.l_type = F_UNLCK;
+  fcntl(fd, F_SETLK, &lock);
+  close(fd);
+}
+
+/********************************************
+ *
+ *   Party Context for Protocol Execution
+ * 
+ ********************************************/
 
 void cmp_sample_bytes (uint8_t *rand_bytes, uint64_t byte_len)
 {

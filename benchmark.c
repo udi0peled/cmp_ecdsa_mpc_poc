@@ -168,6 +168,8 @@ int main(int argc, char* argv[])
   uint64_t num_parties = 2;
   uint64_t modulus_bits = 1024;
 
+  cmp_comm_init(10);
+
   if (argc >= 2)
   {
     if (strcmp(argv[1], "cmp") == 0) 
@@ -229,15 +231,36 @@ int main(int argc, char* argv[])
 
       return 0;
     }
-    else if (strcmp(argv[2], "zkp") == 0)
+    else if (strcmp(argv[1], "zkp") == 0)
     {
 
     }
+    else if (strcmp(argv[1], "write") == 0)
+    {
+      int from_index = strtoul(argv[2], NULL, 10);
+      int to_index = strtoul(argv[3], NULL, 10);
+      
+      cmp_comm_send_bytes(from_index, to_index, (const uint8_t*) argv[4], strlen(argv[4]));
+
+      return 0;
+    }
+    else if (strcmp(argv[1], "read") == 0)
+    {
+      int from_index = strtoul(argv[2], NULL, 10);
+      int to_index = strtoul(argv[3], NULL, 10);
+      
+      uint8_t buffer[3];
+      cmp_comm_receive_bytes(from_index, to_index, buffer, sizeof(buffer));
+
+      printHexBytes("read: ", buffer, 3, "\n", 0);
+      return 0;
+    }
+    
   }
 
   printf("\nUsage options:\n");
-  printf("%s\n cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
-  printf("%s\n paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
+  printf("%s cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
+  printf("%s paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
   //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
 
   return 1;
