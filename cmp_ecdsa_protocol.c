@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <semaphore.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
 extern int PRINT_VALUES;
@@ -37,8 +38,17 @@ void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *by
   char filename[sizeof(COMM_CHNL_PATTERN) + 8];
   sprintf(filename, COMM_CHNL_PATTERN, my_index, to_index);
 
-  int fd;
-  fd = open(filename, O_RDWR | O_CREAT, 0666);
+  /* semaphore code to lock the shared mem */
+  sem_t* semptr = sem_open(filename, /* name */
+                           O_CREAT,       /* create the semaphore */
+                           0644,   /* protection perms */
+                           0);            /* initial value */
+
+  int semval = 0;
+  sem_getvalue(semptr, &semval);
+  printf("writing data (semv=%d)...\n", semval);
+
+  int fd = open(filename, O_RDWR | O_CREAT, 0644);
 
   struct flock lock;
   lock.l_type = F_WRLCK;
@@ -55,7 +65,14 @@ void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *by
 
   lock.l_type = F_UNLCK;
   fcntl(fd, F_SETLK, &lock);
+
+  sem_post(semptr);
+
+  sem_getvalue(semptr, &semval);
+  printf("done (sem=%d)\n", semval);
+
   close(fd);
+  sem_close(semptr);
 }
 
 void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *bytes, uint64_t byte_len)
@@ -63,14 +80,18 @@ void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *byt
   char filename[sizeof(COMM_CHNL_PATTERN) + 8];
   sprintf(filename, COMM_CHNL_PATTERN, from_index, my_index);
 
-  struct timespec ts;
-  ts.tv_sec = 0;
-  ts.tv_nsec = 1 << 25;
+  /* semaphore code to lock the shared mem */
+  sem_t* semptr = sem_open(filename, /* name */
+                           O_CREAT,       /* create the semaphore */
+                           0644,   /* protection perms */
+                           0);            /* initial value */
 
-  while (access(filename, F_OK ) == -1) nanosleep(&ts, NULL);
+  int semval = 0;
+  sem_getvalue(semptr, &semval);
+  printf("waiting for data sem=(%d)...\n", semval);
+  sem_wait(semptr);
 
-  int fd;
-  fd = open(filename, O_RDWR, 0666);
+  int fd = open(filename, O_RDWR, 0644);
   
   struct flock lock;
   lock.l_type = F_RDLCK;
@@ -84,7 +105,14 @@ void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *byt
 
   lock.l_type = F_UNLCK;
   fcntl(fd, F_SETLK, &lock);
+
+  sem_getvalue(semptr, &semval);
+  printf("got (sem=%d)\n", semval);
+
+
   close(fd);
+  sem_close(semptr);
+  sem_unlink(filename);
 }
 
 /********************************************
