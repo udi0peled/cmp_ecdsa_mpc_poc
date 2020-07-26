@@ -17,6 +17,12 @@ void scalar_to_bytes(uint8_t *bytes, uint64_t byte_len, const scalar_t num)
   BN_bn2binpad(num, bytes, byte_len);
 }
 
+
+void scalar_from_bytes (scalar_t num, const uint8_t *bytes, uint64_t byte_len)
+{
+  BN_bin2bn(bytes, byte_len, num);
+}
+
 void scalar_add (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();
@@ -142,11 +148,19 @@ gr_elem_t   group_elem_new (const ec_group_t ec)                  { return EC_PO
 void        group_elem_free (gr_elem_t el)                        { EC_POINT_clear_free(el); }
 void        group_elem_copy (gr_elem_t copy, const gr_elem_t el)  { EC_POINT_copy(copy, el);}
 
-void        group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec)
+void group_elem_to_bytes (uint8_t *bytes, uint64_t byte_len, gr_elem_t el, const ec_group_t ec)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   EC_POINT_point2oct(ec, el, POINT_CONVERSION_COMPRESSED, bytes, byte_len, bn_ctx);
   BN_CTX_free(bn_ctx);
+}
+
+int group_elem_from_bytes (gr_elem_t el, const uint8_t *bytes, uint64_t byte_len, const ec_group_t ec)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  int ret = EC_POINT_oct2point(ec, el, bytes, byte_len, bn_ctx);
+  BN_CTX_free(bn_ctx);
+  return ret != 1;
 }
 
 /**

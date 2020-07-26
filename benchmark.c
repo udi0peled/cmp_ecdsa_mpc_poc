@@ -127,8 +127,6 @@ void time_bn_ctx(uint64_t reps)
     bn_ctx_arr[i] = BN_CTX_secure_new();
     EC_POINT_mul(ec, el, a[0], NULL, NULL, bn_ctx_arr[i]);
     scalar_add(a[0], a[0], a[1], ec_group_order(ec));
-    // group_elem_to_bytes(el_bytes, sizeof(el_bytes), el, ec);
-    // printHexBytes("# el = ", el_bytes, sizeof(el_bytes), "\n");
   }
 
   diff = clock() - start;
@@ -229,15 +227,17 @@ int main(int argc, char* argv[])
 
       return 0;
     }
-    else if (strcmp(argv[2], "zkp") == 0)
+    else if (strcmp(argv[1], "zkp") == 0)
     {
 
     }
   }
 
+  test_group_elements();
+
   printf("\nUsage options:\n");
-  printf("%s\n cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
-  printf("%s\n paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
+  printf("%s cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
+  printf("%s paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
   //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
 
   return 1;

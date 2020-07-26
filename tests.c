@@ -74,6 +74,32 @@ void test_group_elements()
   printf("el = [0, 1, 2]\n");
 
   group_operation(el[0], NULL, (const gr_elem_t) ec_group_generator(ec), exps[0], ec);
+  
+  gr_elem_t p = el[0];
+  uint64_t p_byte_len = EC_POINT_point2oct(ec, p, (POINT_CONVERSION_COMPRESSED), NULL, 0, bn_ctx);
+  uint8_t *p_bytes = calloc(p_byte_len, 1);
+  printf("point2oct = %ld, p_bytes = %lu\n",
+  EC_POINT_point2oct(ec, p, ( POINT_CONVERSION_COMPRESSED), p_bytes, p_byte_len, bn_ctx),
+  p_byte_len);
+  printHexBytes("p_bytes = ", p_bytes, p_byte_len, "\n", 1);
+  
+  gr_elem_t q = group_elem_new(ec);
+  group_operation(q, NULL, NULL, NULL, ec);
+  printECPOINT("# q = ", q, ec, "\n", 0);
+
+  printHexBytes("p_bytes = ", p_bytes, p_byte_len, "\n", 1);
+  printf("oct2point %d\n",  EC_POINT_oct2point(ec, q, p_bytes, p_byte_len, bn_ctx));
+  printECPOINT("# q = ", q, ec, "\n", 0);
+
+  group_operation(q, NULL, NULL, NULL, ec);
+  memset(p_bytes, 0x01, 1);
+  printHexBytes("p_bytes = ", p_bytes, p_byte_len, "\n", 1);
+  printf("oct2point %d\n",  EC_POINT_oct2point(ec, q, p_bytes, p_byte_len, bn_ctx));
+  printECPOINT("# q = ", q, ec, "\n", 0);
+
+  group_elem_free(q);
+
+  
   printECPOINT("# el[0] = ", el[0], ec, "\n", 0);
   printf("el[0] = G * exps[0]\n");
 
