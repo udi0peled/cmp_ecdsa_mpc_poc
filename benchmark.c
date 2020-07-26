@@ -231,6 +231,28 @@ int main(int argc, char* argv[])
     {
 
     }
+    else if (strcmp(argv[1], "write") == 0)
+    {
+      int from_index = strtoul(argv[2], NULL, 10);
+      int to_index = strtoul(argv[3], NULL, 10);
+      
+      cmp_comm_send_bytes(from_index, to_index, (const uint8_t*) argv[4], strlen(argv[4]));
+
+      return 0;
+    }
+    else if (strcmp(argv[1], "read") == 0)
+    {
+      int from_index = strtoul(argv[2], NULL, 10);
+      int to_index = strtoul(argv[3], NULL, 10);
+      
+      uint8_t buffer[3];
+      cmp_comm_receive_bytes(from_index, to_index, buffer, sizeof(buffer));
+      printHexBytes("read: ", buffer, 3, "\n", 0);
+
+      cmp_comm_close(5);
+      return 0;
+    }
+    
   }
 
   test_group_elements();

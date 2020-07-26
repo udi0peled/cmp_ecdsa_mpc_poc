@@ -3,9 +3,123 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <time.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <semaphore.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
 extern int PRINT_VALUES;
+
+/********************************************
+ *
+ *   Communication Channels
+ * 
+ ********************************************/
+
+#define COMM_CHNL_PATTERN "CHANNEL_%lu_to_%lu.dat"
+
+void cmp_comm_close(uint64_t num_parties)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+
+  for (uint64_t from_index = 0; from_index < num_parties; from_index++)
+  {
+    for (uint64_t to_index = 0; to_index < num_parties; to_index++)
+    {
+      sprintf(filename, COMM_CHNL_PATTERN, from_index, to_index);
+      remove(filename);
+    }
+  }
+}
+
+void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *bytes, uint64_t byte_len)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+  sprintf(filename, COMM_CHNL_PATTERN, my_index, to_index);
+
+  /* semaphore code to lock the shared mem */
+  sem_t* semptr = sem_open(filename, /* name */
+                           O_CREAT,       /* create the semaphore */
+                           0644,   /* protection perms */
+                           0);            /* initial value */
+
+  int semval = 0;
+  sem_getvalue(semptr, &semval);
+  printf("writing data (semv=%d)...\n", semval);
+
+  int fd = open(filename, O_RDWR | O_CREAT, 0644);
+
+  struct flock lock;
+  lock.l_type = F_WRLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0;
+  lock.l_pid = getpid();
+
+  fcntl(fd, F_SETLK, &lock);
+  write(fd, bytes, byte_len);
+
+  srand(time(0));
+  sleep(rand() % 5 + 1);
+
+  lock.l_type = F_UNLCK;
+  fcntl(fd, F_SETLK, &lock);
+
+  sem_post(semptr);
+
+  sem_getvalue(semptr, &semval);
+  printf("done (sem=%d)\n", semval);
+
+  close(fd);
+  sem_close(semptr);
+}
+
+void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *bytes, uint64_t byte_len)
+{
+  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+  sprintf(filename, COMM_CHNL_PATTERN, from_index, my_index);
+
+  /* semaphore code to lock the shared mem */
+  sem_t* semptr = sem_open(filename, /* name */
+                           O_CREAT,       /* create the semaphore */
+                           0644,   /* protection perms */
+                           0);            /* initial value */
+
+  int semval = 0;
+  sem_getvalue(semptr, &semval);
+  printf("waiting for data sem=(%d)...\n", semval);
+  sem_wait(semptr);
+
+  int fd = open(filename, O_RDWR, 0644);
+  
+  struct flock lock;
+  lock.l_type = F_RDLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0;
+  lock.l_pid = getpid();
+
+  fcntl(fd, F_SETLKW, &lock);
+  read(fd, bytes, byte_len);
+
+  lock.l_type = F_UNLCK;
+  fcntl(fd, F_SETLK, &lock);
+
+  sem_getvalue(semptr, &semval);
+  printf("got (sem=%d)\n", semval);
+
+
+  close(fd);
+  sem_close(semptr);
+  sem_unlink(filename);
+}
+
+/********************************************
+ *
+ *   Party Context for Protocol Execution
+ * 
+ ********************************************/
 
 void cmp_sample_bytes (uint8_t *rand_bytes, uint64_t byte_len)
 {
