@@ -128,6 +128,12 @@ void zkp_aux_info_update(zkp_aux_info_t *aux, uint64_t at_pos, const void *updat
   }
 }
 
+void zkp_aux_info_update_move(zkp_aux_info_t *aux, uint64_t *at_pos, const void *update_bytes, uint64_t update_byte_len)
+{
+  zkp_aux_info_update(aux, *at_pos, update_bytes, update_byte_len);
+  if (update_bytes) *at_pos += update_byte_len;
+}
+
 void zkp_aux_info_free(zkp_aux_info_t *aux)
 {
   if (!aux) return;

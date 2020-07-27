@@ -328,9 +328,9 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
 
   // Aux Info (ssid, i, srid)
   uint64_t aux_pos = 0;
-  zkp_aux_info_update(kgd->aux, aux_pos, party->sid_hash, sizeof(hash_chunk));    aux_pos += sizeof(hash_chunk);
-  zkp_aux_info_update(kgd->aux, aux_pos, &party->id, sizeof(uint64_t));           aux_pos += sizeof(uint64_t);
-  zkp_aux_info_update(kgd->aux, aux_pos, party->srid, sizeof(hash_chunk));        aux_pos += sizeof(hash_chunk);
+  zkp_aux_info_update_move(kgd->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(kgd->aux, &aux_pos, &party->id, sizeof(uint64_t));
+  zkp_aux_info_update_move(kgd->aux, &aux_pos, party->srid, sizeof(hash_chunk));
   assert(kgd->aux->info_len == aux_pos);
 
   // Set Schnorr ZKP public claim and secret, then prove
@@ -625,7 +625,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
     for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) reda->combined_rho[pos] ^= party->parties[j]->refresh_data->rho[pos];
 
 
-    if (verified_modulus_size[j] != 1)  printf("%sParty %lu: N_i bitlength from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_modulus_size[j] != 1) printf("%sParty %lu: N_i bitlength from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
     if (verified_public_shares[j] != 1) printf("%sParty %lu: invalid X_j_k sharing from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
     if (verified_decomm[j] != 1)        printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
     if (verified_echo[j] != 1)          printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
@@ -639,9 +639,9 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
 
     // Aux Info for ZKP (ssid, i, combined rho)
   uint64_t aux_pos = 0;
-  zkp_aux_info_update(reda->aux, aux_pos, party->sid_hash, sizeof(hash_chunk));         aux_pos += sizeof(hash_chunk);
-  zkp_aux_info_update(reda->aux, aux_pos, &party->id, sizeof(uint64_t));                aux_pos += sizeof(uint64_t);
-  zkp_aux_info_update(reda->aux, aux_pos, reda->combined_rho, sizeof(hash_chunk));      aux_pos += sizeof(hash_chunk);
+  zkp_aux_info_update_move(reda->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(reda->aux, &aux_pos, &party->id, sizeof(uint64_t));
+  zkp_aux_info_update_move(reda->aux, &aux_pos, reda->combined_rho, sizeof(hash_chunk));
   assert(reda->aux->info_len == aux_pos);
 
   // Generate ZKP, set public claim and secret, then prove
@@ -919,8 +919,8 @@ void cmp_presigning_round_1_exec (cmp_party_t *party)
   paillier_encryption_encrypt(preda->G, preda->gamma, preda->nu, &party->paillier_priv->pub);
 
   uint64_t aux_pos = 0;
-  zkp_aux_info_update(preda->aux, aux_pos, party->sid_hash, sizeof(hash_chunk));    aux_pos += sizeof(hash_chunk);
-  zkp_aux_info_update(preda->aux, aux_pos, &party->id, sizeof(uint64_t));           aux_pos += sizeof(uint64_t);
+  zkp_aux_info_update_move(preda->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(preda->aux, &aux_pos, &party->id, sizeof(uint64_t));
   assert(preda->aux->info_len == aux_pos);
 
   for (uint64_t j = 0; j < party->num_parties; ++j) 

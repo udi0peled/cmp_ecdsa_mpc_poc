@@ -41,10 +41,15 @@ typedef struct
 } zkp_aux_info_t;
 
 // Initialize information. If init_bytes==NULL assume zeros.
-zkp_aux_info_t *zkp_aux_info_new    (uint64_t init_byte_len, const void *init_bytes);
-void            zkp_aux_info_free   (zkp_aux_info_t *aux);
-// Update bytes starting from at_pos. If total needed length for update is longer then existing, extends aux info and length. If update_bytes==NULL, only extend/truncate to needed length, and set zeros where extended.
-void            zkp_aux_info_update (zkp_aux_info_t *aux, uint64_t at_pos, const void *update_bytes, uint64_t update_byte_len);
+zkp_aux_info_t *
+     zkp_aux_info_new         (uint64_t init_byte_len, const void *init_bytes);
+void zkp_aux_info_free        (zkp_aux_info_t *aux);
+// Update bytes starting from at_pos.
+// If total needed length for update is longer then existing, extends aux info and length.
+// If update_bytes==NULL, only extend/truncate to needed length, and set zeros where extended.
+void zkp_aux_info_update      (zkp_aux_info_t *aux, uint64_t at_pos, const void *update_bytes, uint64_t update_byte_len);
+// Same as above, but update at_pos to end of updated bytes (if exist)
+void zkp_aux_info_update_move (zkp_aux_info_t *aux, uint64_t *at_pos, const void *update_bytes, uint64_t update_byte_len);
 
 void fiat_shamir_bytes            (uint8_t *digest, uint64_t digest_len, const uint8_t *data, uint64_t data_len);
 void fiat_shamir_scalars_in_range (scalar_t *results, uint64_t num_res, const scalar_t range, const uint8_t *data, uint64_t data_len);
