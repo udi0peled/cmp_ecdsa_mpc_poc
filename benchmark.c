@@ -37,14 +37,34 @@ paillier_private_key_t *time_paillier_generate_keys(uint64_t paillier_modulus_bi
   diff = clock() - start;
 
   printf("# paillier key\n");
+  printBIGNUM("paillier_phi_N = ", (priv->phi_N), "\n");
   printBIGNUM("p = ", (priv->p), "\n");
   printBIGNUM("q = ", (priv->q), "\n");
-  printBIGNUM("paillier_phi_N = ", (priv->phi_N), "\n");
   printBIGNUM("nmu = ", (priv->mu), "\n");
   printBIGNUM("N = ", (priv->pub.N), "\n");
   printBIGNUM("N2 = ", (priv->pub.N2), "\n");
 
-  printf("### generating single paillier (%d-bits primes) priv/pub key pair: %lu msec\n", BN_num_bits(priv->p), diff * 1000/ CLOCKS_PER_SEC);
+  printf("### generating single paillier (%d-bits modulus) priv/pub key pair: %lu msec\n", BN_num_bits(priv->pub.N), diff * 1000/ CLOCKS_PER_SEC);
+
+  return priv;
+}
+
+ring_pedersen_private_t *time_ring_pedersen_generate_param(uint64_t rped_modulus_bits)
+{
+  start = clock();
+  
+  ring_pedersen_private_t *priv = ring_pedersen_generate_param(rped_modulus_bits/2);
+
+  diff = clock() - start;
+
+  printf("# ring Pedersen parameters\n");
+  printBIGNUM("N = ", priv->pub.N, "\n");
+  printBIGNUM("phi_N = ",priv->phi_N, "\n");
+  printBIGNUM("lambda ", priv->lam, "\n");
+  printBIGNUM("s = ", priv->pub.s, "\n");
+  printBIGNUM("t = ", priv->pub.t, "\n");
+
+  printf("### generating single ring pedersen parameters (%d-bits modulus): %lu msec\n", BN_num_bits(priv->pub.N), diff * 1000/ CLOCKS_PER_SEC);
 
   return priv;
 }
@@ -147,9 +167,6 @@ void time_bn_ctx(uint64_t reps)
   {
     EC_POINT_mul(ec, el, a[0], NULL, NULL, bn_ctx);
     scalar_add(a[0], a[0], a[1], ec_group_order(ec));
-    // group_elem_to_bytes(el_bytes, sizeof(el_bytes), el, ec);
-    // printHexBytes("# el = ", el_bytes, sizeof(el_bytes), "\n");
-
   }
   BN_CTX_free(bn_ctx);
   diff = clock() - start;
@@ -205,38 +222,27 @@ int main(int argc, char* argv[])
 
       // time_paillier_encrypt(100, &priv->pub, 0, 0);
 
-      // test_ring_pedersen(priv->p, priv->q);
-
-      // test_fiat_shamir(100, 100);
-
-      //test_scalars(priv->p, PAILLIER_MODULUS_BYTES/2);
-      //test_scalars(priv->pub.N, PAILLIER_MODULUS_BYTES);
-      // test_scalars(priv->pub.N2, 2*PAILLIER_MODULUS_BYTES);
-
-      //test_group_elements();
-
-      //time_bn_ctx(1000);
-
-      //ring_pedersen_private_t *rped_priv = ring_pedersen_generate_param(priv->p, priv->q);
-      // test_zkp_schnorr();
-
-      // test_zkp_encryption_in_range(&priv->pub, &rped_priv->pub);
-
       paillier_encryption_free_keys(priv, NULL);
-      //ring_pedersen_free_param(rped_priv,NULL);
 
       return 0;
     }
+    else if (strcmp(argv[1], "pedersen") == 0)
+    {
+      if (argc >= 3) modulus_bits = strtoul(argv[2], NULL, 10);
+
+      ring_pedersen_private_t *priv = time_ring_pedersen_generate_param(modulus_bits);
+
+      ring_pedersen_free_param(priv, NULL);
+    }
     else if (strcmp(argv[1], "zkp") == 0)
     {
-
     }
     else if (strcmp(argv[1], "write") == 0)
     {
       int from_index = strtoul(argv[2], NULL, 10);
       int to_index = strtoul(argv[3], NULL, 10);
       
-      cmp_comm_send_bytes(from_index, to_index, (const uint8_t*) argv[4], strlen(argv[4]));
+      cmp_comm_send_bytes(from_index, to_index, 1, (const uint8_t*) argv[4], strlen(argv[4]));
 
       return 0;
     }
@@ -246,16 +252,13 @@ int main(int argc, char* argv[])
       int to_index = strtoul(argv[3], NULL, 10);
       
       uint8_t buffer[3];
-      cmp_comm_receive_bytes(from_index, to_index, buffer, sizeof(buffer));
+      cmp_comm_receive_bytes(from_index, to_index, 1, buffer, sizeof(buffer));
       printHexBytes("read: ", buffer, 3, "\n", 0);
 
-      cmp_comm_close(5);
       return 0;
     }
     
   }
-
-  test_group_elements();
 
   printf("\nUsage options:\n");
   printf("%s cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 

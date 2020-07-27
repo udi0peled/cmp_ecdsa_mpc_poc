@@ -4,8 +4,8 @@
 #include <openssl/rand.h>
 #include <time.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <semaphore.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
@@ -17,100 +17,40 @@ extern int PRINT_VALUES;
  * 
  ********************************************/
 
-#define COMM_CHNL_PATTERN "CHANNEL_%lu_to_%lu.dat"
+#define COMM_CHNL_PATTERN "CHANNEL_%lu_to_%lu_round_%lu.dat"
 
-void cmp_comm_close(uint64_t num_parties)
+void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, uint64_t round, const uint8_t *bytes, uint64_t byte_len)
 {
   char filename[sizeof(COMM_CHNL_PATTERN) + 8];
+  sprintf(filename, COMM_CHNL_PATTERN, my_index, to_index, round);
 
-  for (uint64_t from_index = 0; from_index < num_parties; from_index++)
-  {
-    for (uint64_t to_index = 0; to_index < num_parties; to_index++)
-    {
-      sprintf(filename, COMM_CHNL_PATTERN, from_index, to_index);
-      remove(filename);
-    }
-  }
-}
-
-void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, const uint8_t *bytes, uint64_t byte_len)
-{
-  char filename[sizeof(COMM_CHNL_PATTERN) + 8];
-  sprintf(filename, COMM_CHNL_PATTERN, my_index, to_index);
-
-  /* semaphore code to lock the shared mem */
-  sem_t* semptr = sem_open(filename, /* name */
-                           O_CREAT,       /* create the semaphore */
-                           0644,   /* protection perms */
-                           0);            /* initial value */
-
-  int semval = 0;
-  sem_getvalue(semptr, &semval);
-  printf("writing data (semv=%d)...\n", semval);
+  // Lock reader until finished sending/writing to file
+  sem_t* semptr = sem_open(filename, O_CREAT, 0644, 0);
 
   int fd = open(filename, O_RDWR | O_CREAT, 0644);
-
-  struct flock lock;
-  lock.l_type = F_WRLCK;
-  lock.l_whence = SEEK_SET;
-  lock.l_start = 0;
-  lock.l_len = 0;
-  lock.l_pid = getpid();
-
-  fcntl(fd, F_SETLK, &lock);
   write(fd, bytes, byte_len);
 
   srand(time(0));
   sleep(rand() % 5 + 1);
 
-  lock.l_type = F_UNLCK;
-  fcntl(fd, F_SETLK, &lock);
-
-  sem_post(semptr);
-
-  sem_getvalue(semptr, &semval);
-  printf("done (sem=%d)\n", semval);
-
   close(fd);
+  sem_post(semptr);
   sem_close(semptr);
 }
 
-void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint8_t *bytes, uint64_t byte_len)
+void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint64_t round, uint8_t *bytes, uint64_t byte_len)
 {
   char filename[sizeof(COMM_CHNL_PATTERN) + 8];
-  sprintf(filename, COMM_CHNL_PATTERN, from_index, my_index);
+  sprintf(filename, COMM_CHNL_PATTERN, from_index, my_index, round);
 
-  /* semaphore code to lock the shared mem */
-  sem_t* semptr = sem_open(filename, /* name */
-                           O_CREAT,       /* create the semaphore */
-                           0644,   /* protection perms */
-                           0);            /* initial value */
-
-  int semval = 0;
-  sem_getvalue(semptr, &semval);
-  printf("waiting for data sem=(%d)...\n", semval);
+  // Wait until file is written by sender
+  sem_t* semptr = sem_open(filename, O_CREAT, 0644, 0);
   sem_wait(semptr);
 
-  int fd = open(filename, O_RDWR, 0644);
-  
-  struct flock lock;
-  lock.l_type = F_RDLCK;
-  lock.l_whence = SEEK_SET;
-  lock.l_start = 0;
-  lock.l_len = 0;
-  lock.l_pid = getpid();
-
-  fcntl(fd, F_SETLKW, &lock);
+  int fd = open(filename, O_RDONLY, 0644);  
   read(fd, bytes, byte_len);
-
-  lock.l_type = F_UNLCK;
-  fcntl(fd, F_SETLK, &lock);
-
-  sem_getvalue(semptr, &semval);
-  printf("got (sem=%d)\n", semval);
-
-
   close(fd);
+  remove(filename);
   sem_close(semptr);
   sem_unlink(filename);
 }
@@ -139,12 +79,12 @@ void cmp_set_sid_hash(cmp_party_t *party)
   SHA512_Update(&sha_ctx, party->sid, sizeof(hash_chunk));
   SHA512_Update(&sha_ctx, party->srid, sizeof(hash_chunk));
 
-  uint8_t temp_bytes[PAILLIER_MODULUS_BYTES];           // Enough for uint64_t and group_element
+  uint8_t *temp_bytes = malloc(PAILLIER_MODULUS_BYTES);           // Enough for uint64_t and group_element
 
-  group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, party->ec_gen, party->ec);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, party->ec_gen, party->ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  scalar_to_bytes(temp_bytes,GROUP_ORDER_BYTES, party->ec_order);
+  scalar_to_bytes(&temp_bytes,GROUP_ORDER_BYTES, party->ec_order, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ORDER_BYTES);
 
   for (uint64_t i = 0; i < party->num_parties; ++i)
@@ -152,21 +92,22 @@ void cmp_set_sid_hash(cmp_party_t *party)
     SHA512_Update(&sha_ctx, &party->parties_ids[i], sizeof(uint64_t));
     if (party->public_X[i])
     {
-      group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, party->public_X[i], party->ec);
+      group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, party->public_X[i], party->ec, 0);
       SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
     }
     if (party->paillier_pub[i] && party->rped_pub[i])
     {
-      scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, party->paillier_pub[i]->N);
+      scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->paillier_pub[i]->N, 0);
       SHA512_Update(&sha_ctx, temp_bytes, PAILLIER_MODULUS_BYTES);
-      scalar_to_bytes(temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->N);
+      scalar_to_bytes(&temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->N, 0);
       SHA512_Update(&sha_ctx, temp_bytes, RING_PED_MODULUS_BYTES);
-      scalar_to_bytes(temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->s);
+      scalar_to_bytes(&temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->s, 0);
       SHA512_Update(&sha_ctx, temp_bytes, RING_PED_MODULUS_BYTES);
-      scalar_to_bytes(temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->t);
+      scalar_to_bytes(&temp_bytes, RING_PED_MODULUS_BYTES, party->rped_pub[i]->t, 0);
       SHA512_Update(&sha_ctx, temp_bytes, RING_PED_MODULUS_BYTES);
     }
   }
+  free(temp_bytes);
 
   SHA512_Final(party->sid_hash, &sha_ctx);
 }
@@ -275,7 +216,7 @@ void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, 
 {
   cmp_key_generation_t *kgd = party->key_generation_data;
 
-  uint8_t temp_bytes[GROUP_ELEMENT_BYTES];
+  uint8_t *temp_bytes = malloc(GROUP_ELEMENT_BYTES);
 
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
@@ -283,13 +224,15 @@ void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, 
   SHA512_Update(&sha_ctx, &party_id, sizeof(uint64_t));
   SHA512_Update(&sha_ctx, kgd->srid, sizeof(hash_chunk));
   
-  group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, kgd->public_X, party->ec);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgd->public_X, party->ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, kgd->psi->proof.A, party->ec);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgd->psi->proof.A, party->ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
   SHA512_Update(&sha_ctx, kgd->u, sizeof(hash_chunk));
   SHA512_Final(V, &sha_ctx);
+  
+  free(temp_bytes);
 }
 
 void  cmp_key_generation_round_1_exec (cmp_party_t *party)
@@ -398,7 +341,9 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
   
-  printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + zkp_schnorr_proof_bytes(), time_diff);
+  uint64_t psi_bytes;
+  zkp_schnorr_proof_to_bytes(NULL, &psi_bytes, NULL, 0);
+  printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + psi_bytes, time_diff);
 
   if (!PRINT_VALUES) return;
   printHexBytes("combined srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
@@ -517,7 +462,7 @@ void cmp_refresh_aux_info_round_1_commit(hash_chunk V, const hash_chunk sid_hash
 {
   cmp_refresh_aux_info_t *reda = party->refresh_data;
 
-  uint8_t temp_bytes[PAILLIER_MODULUS_BYTES];     // Enough also for GROUP_ELEMENT_BYTES
+  uint8_t *temp_bytes = malloc(PAILLIER_MODULUS_BYTES);     // Enough also for GROUP_ELEMENT_BYTES
 
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
@@ -526,30 +471,32 @@ void cmp_refresh_aux_info_round_1_commit(hash_chunk V, const hash_chunk sid_hash
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, reda->reshare_public_X_j[j], party->ec);
+    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, reda->reshare_public_X_j[j], party->ec, 0);
     SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
   }
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    group_elem_to_bytes(temp_bytes, GROUP_ELEMENT_BYTES, reda->psi_sch[j]->proof.A, party->ec);
+    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, reda->psi_sch[j]->proof.A, party->ec, 0);
     SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
   }
 
-  scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, reda->paillier_priv->pub.N);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->paillier_priv->pub.N, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.N);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.N, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.s);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.s, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.t);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.t, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
   SHA512_Update(&sha_ctx, reda->rho, sizeof(hash_chunk));
   SHA512_Update(&sha_ctx, reda->u, sizeof(hash_chunk));
   SHA512_Final(V, &sha_ctx);
+  
+  free(temp_bytes);
 }
 
 void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
@@ -560,12 +507,12 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
   cmp_refresh_aux_info_t *reda = party->refresh_data;
 
   reda->paillier_priv = paillier_encryption_generate_key(4*PAILLIER_MODULUS_BYTES);
-
+  reda->rped_priv = ring_pedersen_generate_param(4*RING_PED_MODULUS_BYTES);
+  
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->prime_time = time_diff;
 
   time_start = clock();
-  reda->rped_priv = ring_pedersen_generate_param(reda->paillier_priv->p, reda->paillier_priv->q);
   
   // Sample other parties' reshares, set negative of sum for current
   scalar_set_ul(reda->reshare_secret_x_j[party->index], 0);
@@ -658,7 +605,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
     if (j == party->index) continue; 
 
     // Verify modulus size
-    verified_modulus_size[j] = scalar_bitlength(party->parties[j]->refresh_data->paillier_priv->pub.N) == 8*PAILLIER_MODULUS_BYTES;
+    verified_modulus_size[j] = scalar_bitlength(party->parties[j]->refresh_data->paillier_priv->pub.N) >= 8*PAILLIER_MODULUS_BYTES-1;
 
     // Verify shared public X_j is valid
     group_operation(combined_public, NULL, NULL, NULL, party->ec);
@@ -722,8 +669,16 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
   
+  uint64_t psi_sch_bytes;
+  uint64_t psi_rped_bytes;
+  uint64_t psi_mod_bytes;
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytes, NULL, 0);
+  zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytes, NULL, 0);
+  zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytes, NULL, 0);
+
+
   printf("### Round 3. Party %lu publishes (sid, i, psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", party->id, 
-    2*sizeof(uint64_t) + zkp_paillier_blum_proof_bytes() + zkp_ring_pedersen_param_proof_bytes() + (party->num_parties-1)*zkp_schnorr_proof_bytes() + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
+    2*sizeof(uint64_t) + psi_mod_bytes + psi_rped_bytes + (party->num_parties-1)*psi_sch_bytes + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
 
   if (!PRINT_VALUES) return;
   printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);
@@ -984,8 +939,10 @@ void cmp_presigning_round_1_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
 
+  uint64_t psi_enc_bytes;
+  zkp_encryption_in_range_proof_to_bytes(NULL, &psi_enc_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
   printf("### Round 1. Party %lu broadcasts (sid, i, K_i, G_i). Send (sid, i, psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id,
-    2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * zkp_encryption_in_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES), time_diff);
+    2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * psi_enc_bytes, time_diff);
 
   if (!PRINT_VALUES) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
@@ -1003,17 +960,19 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
   int *verified_psi_enc = calloc(party->num_parties, sizeof(int));
 
   // Echo broadcast - Send hash of all K_j,G_j
-  uint8_t temp_bytes[PAILLIER_MODULUS_BYTES];
+  uint8_t *temp_bytes = malloc(PAILLIER_MODULUS_BYTES);
+
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
   for (uint64_t i = 0; i < party->num_parties; ++i)
   {
-    scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->K);
+    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->K, 0);
     SHA512_Update(&sha_ctx, temp_bytes, PAILLIER_MODULUS_BYTES);
-    scalar_to_bytes(temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->G);
+    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->G, 0);
     SHA512_Update(&sha_ctx, temp_bytes, PAILLIER_MODULUS_BYTES);
   }
   SHA512_Final(preda->echo_broadcast, &sha_ctx);
+  free(temp_bytes);
 
   // Verify psi_enc received
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -1122,10 +1081,14 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
 
-  printf("### Round 2. Party %lu sends (sid, i, Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + GROUP_ELEMENT_BYTES + (party->num_parties-1) * ( 4*PAILLIER_MODULUS_BYTES 
-    + zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES)
-    + zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES)
-    + zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES)), time_diff);
+  uint64_t psi_affp_bytes;
+  uint64_t psi_affg_bytes;
+  uint64_t psi_logG_bytes;
+  zkp_operation_paillier_commitment_range_proof_to_bytes(NULL, &psi_affp_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
+  zkp_operation_group_commitment_range_proof_to_bytes(NULL, &psi_affg_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
+  zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logG_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
+
+  printf("### Round 2. Party %lu sends (sid, i, Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + GROUP_ELEMENT_BYTES + (party->num_parties-1) * ( 4*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes), time_diff);
   
   if (!PRINT_VALUES) return;
   printf("Gamma_%lu = ", party->index); printECPOINT("", preda->Gamma, party->ec, "\n", 1);
@@ -1219,8 +1182,11 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
   
+  uint64_t psi_logK_bytes;
+  zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logK_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
+
   printf("### Round 3. Party %lu publishes (sid, i, delta_i, Delta_i, psi_logK_j)).\t>>>\t%lu B, %lu ms\n", party->id, 
-    2*sizeof(uint64_t) + GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + (party->num_parties -1)*zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES), time_diff);
+    2*sizeof(uint64_t) + GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + (party->num_parties -1)*psi_logK_bytes, time_diff);
 
   if (!PRINT_VALUES) return;
   printf("delta_%lu = ", party->index); printBIGNUM("", preda->delta, "\n");

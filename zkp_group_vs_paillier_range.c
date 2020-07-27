@@ -39,21 +39,20 @@ void zkp_group_vs_paillier_range_challenge (scalar_t e, zkp_group_vs_paillier_ra
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                                         data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);
+  data_pos += aux->info_len;
 
-  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES , zkp->public.paillier_pub->N);    data_pos += PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->N);        data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->s);        data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->t);        data_pos += RING_PED_MODULUS_BYTES;
-  
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->public.g, zkp->public.G);   data_pos += GROUP_ELEMENT_BYTES;
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->public.X, zkp->public.G);   data_pos += GROUP_ELEMENT_BYTES;
-  scalar_to_bytes(data_pos, 2*PAILLIER_MODULUS_BYTES, zkp->public.C);                 data_pos += 2*PAILLIER_MODULUS_BYTES;
-
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->proof.Y, zkp->public.G);    data_pos += GROUP_ELEMENT_BYTES;
-  scalar_to_bytes(data_pos, 2*PAILLIER_MODULUS_BYTES, zkp->proof.A);                  data_pos += 2*PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES, zkp->proof.D);                    data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES, zkp->proof.S);                    data_pos += RING_PED_MODULUS_BYTES;
+  scalar_to_bytes(&data_pos, PAILLIER_MODULUS_BYTES , zkp->public.paillier_pub->N, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->N, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->s, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->t, 1);
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->public.g, zkp->public.G, 1);
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->public.X, zkp->public.G, 1);
+  scalar_to_bytes(&data_pos, 2*PAILLIER_MODULUS_BYTES, zkp->public.C, 1);
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->proof.Y, zkp->public.G, 1);
+  scalar_to_bytes(&data_pos, 2*PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES, zkp->proof.D, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);
 
   assert(fs_data + fs_data_len == data_pos);
 
@@ -166,7 +165,27 @@ int   zkp_group_vs_paillier_range_verify (zkp_group_vs_paillier_range_t *zkp, co
   return is_verified;
 }
 
-uint64_t zkp_group_vs_paillier_range_proof_bytes (uint64_t x_range_bytes)
-{
-  return GROUP_ELEMENT_BYTES + 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*x_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+void zkp_group_vs_paillier_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len, const zkp_group_vs_paillier_range_t *zkp, uint64_t x_range_bytes, int move_to_end)
+{ 
+  uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*x_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *set_bytes = *bytes;
+
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);
+  scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
+  group_elem_to_bytes(&set_bytes, GROUP_ELEMENT_BYTES, zkp->proof.Y, zkp->public.G, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.D, 1);
+  scalar_to_bytes(&set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
+  scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.z_2, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
+  
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
 }

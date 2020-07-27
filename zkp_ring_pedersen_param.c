@@ -34,14 +34,14 @@ void  zkp_ring_pedersen_param_challenge (uint8_t e[STATISTICAL_SECURITY], zkp_ri
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                                   data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);       data_pos += aux->info_len;
 
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->N);         data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->s);         data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->t);         data_pos += RING_PED_MODULUS_BYTES;
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->N, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->s, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->rped_pub->t, 1);
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i) {
-    scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->proof.A[i]);        data_pos += RING_PED_MODULUS_BYTES;
+    scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->proof.A[i], 1);
   }
 
   assert(fs_data + fs_data_len == data_pos);
@@ -107,7 +107,24 @@ int   zkp_ring_pedersen_param_verify (zkp_ring_pedersen_param_t *zkp, const zkp_
   return is_verified;
 }
 
-uint64_t zkp_ring_pedersen_param_proof_bytes ()
+void zkp_ring_pedersen_param_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_ring_pedersen_param_t *zkp, int move_to_end)
 {
-  return 2*RING_PED_MODULUS_BYTES*STATISTICAL_SECURITY;
+  uint64_t needed_byte_len = 2*RING_PED_MODULUS_BYTES*STATISTICAL_SECURITY;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *set_bytes = *bytes;
+  
+  for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
+  {
+    scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.A[i], 1);
+    scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.z[i], 1);
+  }
+
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
 }

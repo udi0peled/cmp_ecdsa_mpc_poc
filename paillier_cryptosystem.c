@@ -1,32 +1,51 @@
 #include "paillier_cryptosystem.h"
 
-paillier_private_key_t *paillier_encryption_generate_key (uint64_t prime_bits)
+paillier_private_key_t *paillier_encryption_key_from_primes (const scalar_t p, const scalar_t q)
 {
   paillier_private_key_t *priv = malloc(sizeof(*priv));
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
-  priv->p       = scalar_new();
-  priv->q       = scalar_new();
+  priv->p = BN_dup(p);
+  priv->q = BN_dup(q);
+  
   priv->mu      = scalar_new();
   priv->phi_N   = scalar_new();
   priv->pub.N   = scalar_new();
   priv->pub.N2  = scalar_new();
 
-  sample_safe_prime(priv->p, prime_bits);
-  sample_safe_prime(priv->q, prime_bits);
-
-  BN_mul(priv->pub.N, priv->p, priv->q, bn_ctx);
+  BN_mul(priv->pub.N, p, q, bn_ctx);
   BN_sqr(priv->pub.N2, priv->pub.N, bn_ctx);
 
-  BN_sub(priv->phi_N, priv->pub.N, priv->p);
-  BN_sub(priv->phi_N, priv->phi_N, priv->q);
+  BN_sub(priv->phi_N, priv->pub.N, p);
+  BN_sub(priv->phi_N, priv->phi_N, q);
   BN_add_word(priv->phi_N, 1);
 
   BN_mod_inverse(priv->mu, priv->phi_N, priv->pub.N, bn_ctx);
   
   BN_CTX_free(bn_ctx);
 
+  return priv;
+}
+
+
+paillier_private_key_t *paillier_encryption_generate_key (uint64_t prime_bits)
+{
+  scalar_t p     = scalar_new();
+  scalar_t q     = scalar_new();
+  scalar_t three = scalar_new();
+  scalar_t four  = scalar_new();
+
+  scalar_set_ul(three, 3);
+  scalar_set_ul(four, 4);
+
+  BN_generate_prime_ex(p, prime_bits, 0, four, three, NULL);
+  BN_generate_prime_ex(q, prime_bits, 0, four, three, NULL);
+
+  paillier_private_key_t *priv = paillier_encryption_key_from_primes (p, q);
+
+  scalar_free(p);
+  scalar_free(q);
   return priv;
 }
 

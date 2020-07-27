@@ -34,10 +34,11 @@ void zkp_schnoor_challenge(scalar_t e, const zkp_schnorr_t *zkp, const zkp_aux_i
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                                          data_pos += aux->info_len;
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->public.g, zkp->public.G);    data_pos += GROUP_ELEMENT_BYTES;
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->public.X, zkp->public.G);    data_pos += GROUP_ELEMENT_BYTES;
-  group_elem_to_bytes(data_pos, GROUP_ELEMENT_BYTES, zkp->proof.A, zkp->public.G);     data_pos += GROUP_ELEMENT_BYTES;
+  memcpy(data_pos, aux->info, aux->info_len);
+  data_pos += aux->info_len;
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->public.g, zkp->public.G, 1);
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->public.X, zkp->public.G, 1);
+  group_elem_to_bytes(&data_pos, GROUP_ELEMENT_BYTES, zkp->proof.A, zkp->public.G, 1);
 
   assert(fs_data + fs_data_len == data_pos);
 
@@ -84,7 +85,21 @@ int zkp_schnorr_verify (zkp_schnorr_t *zkp, const zkp_aux_info_t *aux)
   return is_verified;
 }
 
-uint64_t zkp_schnorr_proof_bytes ()
+void zkp_schnorr_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_schnorr_t *zkp, int move_to_end)
 {
-  return GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES;
+  uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *set_bytes = *bytes;
+  
+  group_elem_to_bytes(&set_bytes, GROUP_ELEMENT_BYTES, zkp->proof.A, zkp->public.G, 1);
+  scalar_to_bytes(&set_bytes, GROUP_ORDER_BYTES, zkp->proof.z, 1);
+
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
 }

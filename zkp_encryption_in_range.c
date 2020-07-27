@@ -36,18 +36,17 @@ void zkp_encryption_in_range_challenge (scalar_t e, zkp_encryption_in_range_t *z
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                                         data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);
+  data_pos += aux->info_len;
 
-  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES , zkp->public.paillier_pub->N);    data_pos += PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->N);        data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->s);        data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->t);        data_pos += RING_PED_MODULUS_BYTES;
-
-  scalar_to_bytes(data_pos, 2*PAILLIER_MODULUS_BYTES , zkp->public.K);                data_pos += 2*PAILLIER_MODULUS_BYTES;
-
-  scalar_to_bytes(data_pos, 2*PAILLIER_MODULUS_BYTES , zkp->proof.A);                 data_pos += 2*PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->proof.C);                   data_pos += RING_PED_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, RING_PED_MODULUS_BYTES , zkp->proof.S);                   data_pos += RING_PED_MODULUS_BYTES;
+  scalar_to_bytes(&data_pos, PAILLIER_MODULUS_BYTES , zkp->public.paillier_pub->N, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->N, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->s, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->public.rped_pub->t, 1);
+  scalar_to_bytes(&data_pos, 2*PAILLIER_MODULUS_BYTES , zkp->public.K, 1);
+  scalar_to_bytes(&data_pos, 2*PAILLIER_MODULUS_BYTES , zkp->proof.A, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->proof.C, 1);
+  scalar_to_bytes(&data_pos, RING_PED_MODULUS_BYTES , zkp->proof.S, 1);
 
   assert(fs_data + fs_data_len == data_pos);
 
@@ -145,7 +144,26 @@ int zkp_encryption_in_range_verify (zkp_encryption_in_range_t *zkp, const zkp_au
   return is_verified;
 }
 
-uint64_t zkp_encryption_in_range_proof_bytes (uint64_t k_range_bytes)
-{
-  return 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*k_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
-} 
+
+void zkp_encryption_in_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len, const zkp_encryption_in_range_t *zkp, uint64_t k_range_bytes, int move_to_end)
+{ 
+  uint64_t needed_byte_len = 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*k_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *set_bytes = *bytes;
+
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);
+  scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.C, 1);
+  scalar_to_bytes(&set_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
+  scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.z_2, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
+  
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
+}

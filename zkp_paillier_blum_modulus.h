@@ -35,10 +35,10 @@ typedef struct
 } zkp_paillier_blum_modulus_t;
 
 zkp_paillier_blum_modulus_t *
-         zkp_paillier_blum_new         ();
-void     zkp_paillier_blum_free        (zkp_paillier_blum_modulus_t *zkp);
-void     zkp_paillier_blum_prove       (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
-int      zkp_paillier_blum_verify      (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
-uint64_t zkp_paillier_blum_proof_bytes ();
+     zkp_paillier_blum_new            ();
+void zkp_paillier_blum_free           (zkp_paillier_blum_modulus_t *zkp);
+void zkp_paillier_blum_prove          (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+int  zkp_paillier_blum_verify         (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
+void zkp_paillier_blum_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_paillier_blum_modulus_t *zkp, int move_to_end);
 
 #endif

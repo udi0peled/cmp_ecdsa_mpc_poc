@@ -44,10 +44,11 @@ void  zkp_paillier_blum_challenge (scalar_t y[STATISTICAL_SECURITY], zkp_paillie
   uint8_t *fs_data = malloc(fs_data_len);
   uint8_t *data_pos = fs_data;
 
-  memcpy(data_pos, aux->info, aux->info_len);                             data_pos += aux->info_len;
+  memcpy(data_pos, aux->info, aux->info_len);
+  data_pos += aux->info_len;
 
-  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->public->N);        data_pos += PAILLIER_MODULUS_BYTES;
-  scalar_to_bytes(data_pos, PAILLIER_MODULUS_BYTES, zkp->proof.w);          data_pos += PAILLIER_MODULUS_BYTES;
+  scalar_to_bytes(&data_pos, PAILLIER_MODULUS_BYTES, zkp->public->N, 1);
+  scalar_to_bytes(&data_pos, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
 
   assert(fs_data + fs_data_len == data_pos);
 
@@ -193,7 +194,28 @@ int   zkp_paillier_blum_verify (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_
   return is_verified;
 }
 
-uint64_t zkp_paillier_blum_proof_bytes ()
+void zkp_paillier_blum_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_paillier_blum_modulus_t *zkp, int move_to_end)
 {
-  return PAILLIER_MODULUS_BYTES*(1 + 2*STATISTICAL_SECURITY) + 2*STATISTICAL_SECURITY;
+  uint64_t needed_byte_len = PAILLIER_MODULUS_BYTES*(1 + 2*STATISTICAL_SECURITY) + 2*STATISTICAL_SECURITY;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *set_bytes = *bytes;
+  
+  scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
+  for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
+  {
+    scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.x[i], 1);
+    scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.z[i], 1);
+    
+    memcpy(set_bytes, &zkp->proof.a[i], 1);       set_bytes += 1;
+    memcpy(set_bytes, &zkp->proof.b[i], 1);       set_bytes += 1;
+  }
+
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
 }

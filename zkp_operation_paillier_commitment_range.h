@@ -50,10 +50,10 @@ typedef struct
     scalar_t F;       // RING_PED_MODULUS_BYTES
     scalar_t S;       // RING_PED_MODULUS_BYTES
     scalar_t T;       // RING_PED_MODULUS_BYTES
-    scalar_t z_1;     // x_range_bytes + range_slack_bytes
-    scalar_t z_2;     // y_range_bytes + range_slack_bytes
-    scalar_t z_3;     // RING_PED_MODULUS_BYTES + x_range_bytes + range_slack_bytes
-    scalar_t z_4;     // RING_PED_MODULUS_BYTES + x_range_bytes + range_slack_bytes
+    scalar_t z_1;     // x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES
+    scalar_t z_2;     // y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES
+    scalar_t z_3;     // RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES
+    scalar_t z_4;     // RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES
     scalar_t w;       // PAILLIER_MODULUS_BYTES
     scalar_t w_x;     // PAILLIER_MODULUS_BYTES
     scalar_t w_y;     // PAILLIER_MODULUS_BYTES
@@ -63,10 +63,10 @@ typedef struct
 // Zero Knowledge Proofs
 
 zkp_operation_paillier_commitment_range_t*
-         zkp_operation_paillier_commitment_range_new         ();
-void     zkp_operation_paillier_commitment_range_free        (zkp_operation_paillier_commitment_range_t *zkp);
-void     zkp_operation_paillier_commitment_range_prove       (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
-int      zkp_operation_paillier_commitment_range_verify      (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
-uint64_t zkp_operation_paillier_commitment_range_proof_bytes (uint64_t x_range_proof, uint64_t y_range_proof);
+     zkp_operation_paillier_commitment_range_new            ();
+void zkp_operation_paillier_commitment_range_free           (zkp_operation_paillier_commitment_range_t *zkp);
+void zkp_operation_paillier_commitment_range_prove          (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+int  zkp_operation_paillier_commitment_range_verify         (zkp_operation_paillier_commitment_range_t *zkp, const zkp_aux_info_t *aux);
+void zkp_operation_paillier_commitment_range_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_operation_paillier_commitment_range_t *zkp, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end);
 
 #endif

@@ -47,10 +47,10 @@ typedef struct
 
 
 zkp_encryption_in_range_t *
-         zkp_encryption_in_range_new         ();
-void     zkp_encryption_in_range_free        (zkp_encryption_in_range_t *zkp);
-void     zkp_encryption_in_range_prove       (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
-int      zkp_encryption_in_range_verify      (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
-uint64_t zkp_encryption_in_range_proof_bytes (uint64_t k_range_bytes);
+     zkp_encryption_in_range_new            ();
+void zkp_encryption_in_range_free           (zkp_encryption_in_range_t *zkp);
+void zkp_encryption_in_range_prove          (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
+int  zkp_encryption_in_range_verify         (zkp_encryption_in_range_t *zkp, const zkp_aux_info_t *aux);
+void zkp_encryption_in_range_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_encryption_in_range_t *zkp, uint64_t k_range_bytes, int move_to_end);
 
 #endif

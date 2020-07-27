@@ -36,10 +36,10 @@ typedef struct
 } zkp_ring_pedersen_param_t;
 
 zkp_ring_pedersen_param_t *
-         zkp_ring_pedersen_param_new         ();
-void     zkp_ring_pedersen_param_free        (zkp_ring_pedersen_param_t *zkp);
-void     zkp_ring_pedersen_param_prove       (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
-int      zkp_ring_pedersen_param_verify      (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
-uint64_t zkp_ring_pedersen_param_proof_bytes ();
+     zkp_ring_pedersen_param_new            ();
+void zkp_ring_pedersen_param_free           (zkp_ring_pedersen_param_t *zkp);
+void zkp_ring_pedersen_param_prove          (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
+int  zkp_ring_pedersen_param_verify         (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
+void zkp_ring_pedersen_param_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_ring_pedersen_param_t *zkp, int move_to_end);
 
 #endif

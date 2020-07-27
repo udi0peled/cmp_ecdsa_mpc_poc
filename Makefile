@@ -2,7 +2,7 @@ Bench_Name := benchmark
 
 App_C_Flags := -g -O0 -Wall -Wextra -Wvla -Wno-unknown-pragmas -I.
 App_Cpp_Flags := $(App_C_Flags) -std=c++14
-App_Link_Flags := -lcrypto
+App_Link_Flags := -lcrypto -pthread
 
 all: $(Bench_Name)
 

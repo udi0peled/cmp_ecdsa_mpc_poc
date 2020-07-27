@@ -39,8 +39,8 @@ void      scalar_set_ul            (scalar_t num, unsigned long val);
 void      scalar_sample_in_range   (scalar_t rnd, const scalar_t range_mod, int coprime);
 void      scalar_set_power_of_2    (scalar_t num, uint64_t two_exp);
 // If byte_len too small, does nothing
-void      scalar_to_bytes          (uint8_t *bytes, uint64_t byte_len, const scalar_t num);
-void      scalar_from_bytes        (scalar_t num, const uint8_t *bytes, uint64_t byte_len);
+void      scalar_to_bytes          (uint8_t **bytes, uint64_t byte_len, const scalar_t num, int move_to_end);
+void      scalar_from_bytes        (scalar_t num, uint8_t **bytes, uint64_t byte_len, int move_to_end);
 int       scalar_equal             (const scalar_t a, const scalar_t b);
 int       scalar_bitlength         (const scalar_t a);
 void      scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
@@ -53,8 +53,6 @@ void      scalar_inv               (scalar_t result, const scalar_t num, const s
 void      scalar_exp               (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus);
 // Convert num (after modulus) from range  [0 ... modulus) to [-modulus/2 ... modulus/2)
 void      scalar_make_plus_minus   (scalar_t num, const scalar_t modulus);
-// Sample exact bit-length safe prime
-void      sample_safe_prime        (scalar_t prime, unsigned int bits);
 
 ec_group_t  ec_group_new        ();
 void        ec_group_free       (ec_group_t ec);
@@ -68,9 +66,9 @@ int         group_elem_equal      (const gr_elem_t a, const gr_elem_t b, const e
 int         group_elem_is_ident   (const gr_elem_t a, const ec_group_t ec);
 void        group_elem_get_x      (scalar_t x, const gr_elem_t a, const ec_group_t ec, scalar_t modulus);
 // If byte_len too small, does nothing
-void        group_elem_to_bytes   (uint8_t *bytes, uint64_t byte_len, const gr_elem_t el, const ec_group_t ec);
+void        group_elem_to_bytes   (uint8_t **bytes, uint64_t byte_len, const gr_elem_t el, const ec_group_t ec, int move_to_end);
 // Returns 0/1 for success/error
-int         group_elem_from_bytes (gr_elem_t el, const uint8_t *bytes, uint64_t byte_len, const ec_group_t ec);
+int         group_elem_from_bytes (gr_elem_t el, uint8_t **bytes, uint64_t byte_len, const ec_group_t ec, int move_to_end);
 // Compute initial*(base^exp) in the group. base==NULL retuns identity element of the group. initial==NULL used as identity. exp==NULL used as 1.
 void        group_operation       (gr_elem_t result, const gr_elem_t initial, const gr_elem_t base, const scalar_t exp, const ec_group_t ec);
 

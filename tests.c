@@ -23,7 +23,7 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
   printf("#(%d bytes)\n", BN_num_bytes(beta));
 
   uint8_t *alpha_bytes = malloc(range_byte_len);
-  scalar_to_bytes(alpha_bytes, range_byte_len, alpha);
+  scalar_to_bytes(&alpha_bytes, range_byte_len, alpha, 0);
   printHexBytes("alpha_bytes = 0x", alpha_bytes, range_byte_len, "\n", 1);
 
   scalar_make_plus_minus(alpha, range);
@@ -175,7 +175,7 @@ void test_ring_pedersen(const scalar_t p, const scalar_t q)
 {
   printf("# test_ring_pedersen\n");
 
-  ring_pedersen_private_t *rped_priv = ring_pedersen_generate_param(p, q);
+  ring_pedersen_private_t *rped_priv = ring_pedersen_param_from_primes(p, q);
   ring_pedersen_public_t *rped_pub = ring_pedersen_copy_public(rped_priv);
 
   printBIGNUM("N = ", (rped_pub->N), "\n");

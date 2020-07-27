@@ -1,7 +1,7 @@
 #include "ring_pedersen_parameters.h"
 #include <assert.h>
 
-ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const scalar_t q)
+ring_pedersen_private_t *ring_pedersen_param_from_primes  (const scalar_t p, const scalar_t q)
 {
   ring_pedersen_private_t *priv = malloc(sizeof(*priv));
 
@@ -28,6 +28,22 @@ ring_pedersen_private_t *ring_pedersen_generate_param  (const scalar_t p, const 
   scalar_free(r);
   
   BN_CTX_free(bn_ctx);
+
+  return priv;
+}
+
+ring_pedersen_private_t *ring_pedersen_generate_param (uint64_t prime_bits) 
+{ 
+  scalar_t p = scalar_new();
+  scalar_t q = scalar_new();
+
+  BN_generate_prime_ex(p, prime_bits, 1, NULL, NULL, NULL);
+  BN_generate_prime_ex(q, prime_bits, 1, NULL, NULL, NULL);
+
+  ring_pedersen_private_t *priv = ring_pedersen_param_from_primes(p, q);
+
+  scalar_free(p);
+  scalar_free(q);
 
   return priv;
 }
