@@ -9,7 +9,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/udi/Fireblocks/Dev/cmp_ecdsa_mpc_poc/benchmark",
-      "args": [],
+      "args": ["cmp"],
       "stopAtEntry": false,
       "cwd": "/home/udi/Fireblocks/Dev/cmp_ecdsa_mpc_poc",
       "environment": [],

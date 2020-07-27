@@ -189,3 +189,29 @@ void zkp_group_vs_paillier_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+
+void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, int move_to_end)
+{ 
+  uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*x_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *read_bytes = *bytes;
+
+  scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  group_elem_from_bytes(zkp->proof.Y, &read_bytes, GROUP_ELEMENT_BYTES, zkp->public.G, 1);
+  scalar_from_bytes(zkp->proof.D, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_1, &read_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_2, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

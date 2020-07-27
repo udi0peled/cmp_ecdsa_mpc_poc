@@ -17,6 +17,7 @@
 #define __CMP20_ECDSA_MPC_PAILLIER_CRYPTOSYSTEM_H__
 
 #include "algebraic_elements.h"
+#include <assert.h>
 
 typedef struct 
 {

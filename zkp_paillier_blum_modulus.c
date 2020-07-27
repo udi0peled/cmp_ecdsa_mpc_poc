@@ -219,3 +219,29 @@ void zkp_paillier_blum_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, cons
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+void zkp_paillier_blum_proof_from_bytes (zkp_paillier_blum_modulus_t *zkp, uint8_t **bytes, uint64_t *byte_len, int move_to_end)
+{
+  uint64_t needed_byte_len = PAILLIER_MODULUS_BYTES*(1 + 2*STATISTICAL_SECURITY) + 2*STATISTICAL_SECURITY;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *read_bytes = *bytes;
+  
+  scalar_to_bytes(&read_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
+  for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
+  {
+    scalar_from_bytes(zkp->proof.x[i], &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+    scalar_from_bytes(zkp->proof.z[i], &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+    
+    memcpy(&zkp->proof.a[i], read_bytes, 1);       read_bytes += 1;
+    memcpy(&zkp->proof.b[i], read_bytes, 1);       read_bytes += 1;
+  }
+
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

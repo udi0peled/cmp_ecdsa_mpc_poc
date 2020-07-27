@@ -266,3 +266,33 @@ void zkp_operation_group_commitment_range_proof_to_bytes(uint8_t **bytes, uint64
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+void zkp_operation_group_commitment_range_proof_from_bytes(zkp_operation_group_commitment_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + 6*RING_PED_MODULUS_BYTES + 6*PAILLIER_MODULUS_BYTES + 3*x_range_bytes + y_range_bytes + 4*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *read_bytes = *bytes;
+
+  scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  group_elem_from_bytes(zkp->proof.B_x, &read_bytes, GROUP_ELEMENT_BYTES, zkp->public.G, 1);
+  scalar_from_bytes(zkp->proof.B_y, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.E, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.F, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.T, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_1, &read_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_2, &read_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_4, &read_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.w, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.w_y, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

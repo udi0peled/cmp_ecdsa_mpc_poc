@@ -128,3 +128,25 @@ void zkp_ring_pedersen_param_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+void zkp_ring_pedersen_param_proof_from_bytes (zkp_ring_pedersen_param_t *zkp, uint8_t **bytes, uint64_t *byte_len, int move_to_end)
+{
+  uint64_t needed_byte_len = 2*RING_PED_MODULUS_BYTES*STATISTICAL_SECURITY;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *read_bytes = *bytes;
+  
+  for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
+  {
+    scalar_from_bytes(zkp->proof.A[i], &read_bytes, RING_PED_MODULUS_BYTES, 1);
+    scalar_from_bytes(zkp->proof.z[i], &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  }
+
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

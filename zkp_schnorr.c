@@ -94,6 +94,7 @@ void zkp_schnorr_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_
     *byte_len = needed_byte_len;
     return ;
   }
+
   uint8_t *set_bytes = *bytes;
   
   group_elem_to_bytes(&set_bytes, GROUP_ELEMENT_BYTES, zkp->proof.A, zkp->public.G, 1);
@@ -102,4 +103,24 @@ void zkp_schnorr_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_
   assert(set_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
+}
+
+void zkp_schnorr_proof_from_bytes (zkp_schnorr_t *zkp, uint8_t **bytes, uint64_t *byte_len, int move_to_end)
+{
+  uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  
+  uint8_t *read_bytes = *bytes;
+  
+  group_elem_from_bytes(zkp->proof.A, &read_bytes, GROUP_ELEMENT_BYTES, zkp->public.G, 1);
+  scalar_from_bytes(zkp->proof.z, &read_bytes, GROUP_ORDER_BYTES, 1);
+
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
 }

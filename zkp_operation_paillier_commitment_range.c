@@ -270,3 +270,34 @@ void zkp_operation_paillier_commitment_range_proof_to_bytes(uint8_t **bytes, uin
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+void zkp_operation_paillier_commitment_range_proof_from_bytes(zkp_operation_paillier_commitment_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = 6*RING_PED_MODULUS_BYTES + 9*PAILLIER_MODULUS_BYTES + 3*x_range_bytes + y_range_bytes + 4*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *set_bytes = *bytes;
+ 
+  scalar_from_bytes(zkp->proof.A, &set_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.B_x, &set_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.B_y, &set_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.E, &set_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.F, &set_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.S, &set_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.T, &set_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_1, &set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_2, &set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_3, &set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_4, &set_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.w, &set_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.w_x, &set_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.w_y, &set_bytes, PAILLIER_MODULUS_BYTES, 1);
+
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
+}

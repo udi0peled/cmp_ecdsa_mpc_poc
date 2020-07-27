@@ -49,10 +49,11 @@ typedef struct
 } zkp_group_vs_paillier_range_t;
 
 zkp_group_vs_paillier_range_t *
-     zkp_group_vs_paillier_range_new            ();
-void zkp_group_vs_paillier_range_free           (zkp_group_vs_paillier_range_t *zkp);
-void zkp_group_vs_paillier_range_prove          (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
-int  zkp_group_vs_paillier_range_verify         (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
-void zkp_group_vs_paillier_range_proof_to_bytes (uint8_t **bytes, uint64_t *byte_len, const zkp_group_vs_paillier_range_t *zkp, uint64_t x_range_bytes, int move_to_end);
+     zkp_group_vs_paillier_range_new              ();
+void zkp_group_vs_paillier_range_free             (zkp_group_vs_paillier_range_t *zkp);
+void zkp_group_vs_paillier_range_prove            (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
+int  zkp_group_vs_paillier_range_verify           (zkp_group_vs_paillier_range_t *zkp, const zkp_aux_info_t *aux);
+void zkp_group_vs_paillier_range_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_group_vs_paillier_range_t *zkp, uint64_t x_range_bytes, int move_to_end);
+void zkp_group_vs_paillier_range_proof_from_bytes (zkp_group_vs_paillier_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, int move_to_end);
 
 #endif

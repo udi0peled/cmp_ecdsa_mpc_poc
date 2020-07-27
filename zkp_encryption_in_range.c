@@ -167,3 +167,26 @@ void zkp_encryption_in_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len,
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
 }
+
+void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t k_range_bytes, int move_to_end)
+{ 
+  uint64_t needed_byte_len = 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*k_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+
+  if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+  uint8_t *read_bytes = *bytes;
+
+  scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.C, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_1, &read_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_2, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

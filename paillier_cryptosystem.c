@@ -157,3 +157,46 @@ void paillier_encryption_homomorphic (scalar_t new_cipher, const scalar_t cipher
   scalar_free(res_new_cipher);
   BN_CTX_free(bn_ctx);
 }
+
+
+void paillier_public_to_bytes (uint8_t **bytes, uint64_t *byte_len, const paillier_public_key_t *pub, uint64_t paillier_modulus_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = paillier_modulus_bytes;
+
+  if ((!bytes) || (!*bytes) || (!pub) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *set_bytes = *bytes;
+  
+  scalar_to_bytes(&set_bytes, paillier_modulus_bytes, pub->N, 1);
+  
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
+}
+
+void paillier_public_from_bytes (paillier_public_key_t *pub, uint8_t **bytes, uint64_t *byte_len, uint64_t paillier_modulus_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = paillier_modulus_bytes;
+
+  if ((!bytes) || (!*bytes) || (!pub) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *read_bytes = *bytes;
+  
+  scalar_from_bytes(pub->N, &read_bytes, paillier_modulus_bytes, 1);
+  
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  BN_sqr(pub->N2, pub->N, bn_ctx);
+  BN_CTX_free(bn_ctx);
+  
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}

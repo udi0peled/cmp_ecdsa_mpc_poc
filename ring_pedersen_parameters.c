@@ -100,3 +100,45 @@ void  ring_pedersen_commit(scalar_t rped_commitment, const scalar_t s_exp, const
   scalar_free(first_factor);
   BN_CTX_free(bn_ctx);
 }
+
+void ring_pedersen_public_to_bytes (uint8_t **bytes, uint64_t *byte_len, const ring_pedersen_public_t *rped_pub, uint64_t rped_modulus_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = 3*rped_modulus_bytes;
+
+  if ((!bytes) || (!*bytes) || (!rped_pub) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *set_bytes = *bytes;
+  
+  scalar_to_bytes(&set_bytes, rped_modulus_bytes, rped_pub->N, 1);
+  scalar_to_bytes(&set_bytes, rped_modulus_bytes, rped_pub->s, 1);
+  scalar_to_bytes(&set_bytes, rped_modulus_bytes, rped_pub->t, 1);
+
+  assert(set_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = set_bytes;
+}
+
+void ring_pedersen_public_from_bytes (ring_pedersen_public_t *rped_pub, uint8_t **bytes, uint64_t *byte_len, uint64_t rped_modulus_bytes, int move_to_end)
+{
+  uint64_t needed_byte_len = 3*rped_modulus_bytes;
+
+  if ((!bytes) || (!*bytes) || (!rped_pub) || (needed_byte_len > *byte_len))
+  {
+    *byte_len = needed_byte_len;
+    return ;
+  }
+
+  uint8_t *read_bytes = *bytes;
+  
+  scalar_from_bytes(rped_pub->N, &read_bytes, rped_modulus_bytes, 1);
+  scalar_from_bytes(rped_pub->s, &read_bytes, rped_modulus_bytes, 1);
+  scalar_from_bytes(rped_pub->t, &read_bytes, rped_modulus_bytes, 1);
+
+  assert(read_bytes == *bytes + needed_byte_len);
+  *byte_len = needed_byte_len;
+  if (move_to_end) *bytes = read_bytes;
+}
