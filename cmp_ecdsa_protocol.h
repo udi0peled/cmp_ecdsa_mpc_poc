@@ -54,21 +54,19 @@
 typedef uint8_t hash_chunk[KAPPA_RANDOM_ORACLE_BYTES];
 
 /**
- *  Temporary data for key generation phase
+ *  Key generation phase
  */
+
+// Payload Received from other parties
 
 typedef struct 
 {
-  // private/public key pair
-  scalar_t  secret_x;
+  // Public key share
   gr_elem_t public_X;
 
-  // ZKP data
-  zkp_aux_info_t  *aux;
-  scalar_t        tau;
-  zkp_schnorr_t   *psi;             
-  // Schnorr zkp commitment from all other parties
-  scalar_t        *received_A;      
+  // Schnorr ZKP payload
+  gr_elem_t       commited_A;
+  zkp_schnorr_t   *psi_sch;
 
   // Echo broadcast and random oracle data seed
   hash_chunk srid;
@@ -76,12 +74,23 @@ typedef struct
   hash_chunk V;
   hash_chunk echo_broadcast;
 
-  // all other party's public keys
-  scalar_t *received_X;
+} cmp_key_generation_payload_t;
+
+// Data generated, and payload received from others (including sent payload)
+typedef struct 
+{
+  // Private key share
+  scalar_t  secret_x;
+
+  // ZKP Schnorr data
+  zkp_aux_info_t  *aux;
+  scalar_t        tau;
+  
+  // Recevied KGD payload of all parties (including self to send)
+  cmp_key_generation_payload_t **payload;
 
   uint64_t run_time;
-} cmp_key_generation_t;
-
+} cmp_key_generation_data_t;
 
 /**
  *  Temporary data for refresh auxiliary infromation phase
@@ -163,9 +172,9 @@ typedef struct
 
 typedef struct cmp_party_t
 {
-  uint64_t id;
   // Party's index in parties array, important to be consisten betwenn all parties
   uint64_t index;
+  uint64_t id;
   uint64_t num_parties;
   uint64_t *parties_ids;
 
@@ -173,7 +182,7 @@ typedef struct cmp_party_t
   scalar_t  secret_x;
   gr_elem_t *public_X;
 
-  // My private key and all parties's public keys (by party index)
+  // My private key and all parties's public keys (by index)
   paillier_private_key_t *paillier_priv;
   paillier_public_key_t  **paillier_pub;   
   ring_pedersen_public_t **rped_pub;
@@ -188,9 +197,9 @@ typedef struct cmp_party_t
   hash_chunk sid_hash;
 
   // Temporary data for relevant phase
-  cmp_key_generation_t    *key_generation_data;
-  cmp_refresh_aux_info_t  *refresh_data;
-  cmp_presigning_t        *presigning_data;
+  cmp_key_generation_data_t *key_generation_data;
+  cmp_refresh_aux_info_t    *refresh_data;
+  cmp_presigning_t          *presigning_data;
 
   // Generated signature share
   gr_elem_t R;
@@ -198,11 +207,12 @@ typedef struct cmp_party_t
   scalar_t chi;
 
   // Access all other parties' data (and temporary data when relevant), instead of communication
-  struct cmp_party_t **parties;             
+  struct cmp_party_t **parties;
 } cmp_party_t;
 
-void cmp_party_new  (cmp_party_t **parties, uint64_t num_parties, const uint64_t *parties_ids, uint64_t index, const hash_chunk sid);
-void cmp_party_free (cmp_party_t *party);
+cmp_party_t *
+      cmp_party_new (uint64_t party_index, uint64_t num_parties, const uint64_t *parties_ids, const hash_chunk sid);
+void  cmp_party_free (cmp_party_t *party);
 
 void cmp_key_generation_init         (cmp_party_t *party);
 void cmp_key_generation_clean        (cmp_party_t *party);

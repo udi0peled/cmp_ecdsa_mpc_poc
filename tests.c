@@ -373,15 +373,15 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
  *
  */
 
-void execute_key_generation (cmp_party_t *parties[], uint64_t num_parties)
+void execute_key_generation (cmp_party_t *party)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_init(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_final_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_key_generation_clean(parties[i]);
+  cmp_key_generation_init(party);
+  cmp_key_generation_round_1_exec(party);
+  cmp_key_generation_round_2_exec(party);
+  cmp_key_generation_round_3_exec(party);
+  cmp_key_generation_final_exec(party);
+  cmp_key_generation_clean(party);
 }
 
 void execute_refresh_and_aux_info (cmp_party_t *parties[], uint64_t num_parties)
@@ -492,31 +492,32 @@ void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
 
 int PRINT_VALUES;
 
-void test_protocol(uint64_t num_parties, int print_values)
+void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values)
 {
   PRINT_VALUES = print_values;
 
   hash_chunk  sid = "Fireblocks";
   uint64_t    *party_ids = calloc(num_parties, sizeof(uint64_t));
-  cmp_party_t **parties = calloc(num_parties, sizeof(cmp_party_t*));
+  //cmp_party_t **parties = calloc(num_parties, sizeof(cmp_party_t*));
 
   // Initialize party ids
   for (uint64_t i = 0; i < num_parties; ++i) party_ids[i] = i;
   
   // Initialize Parties
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_party_new(parties, num_parties, party_ids, i, sid);
+  cmp_party_t *party = cmp_party_new(party_index, num_parties, party_ids, sid);
 
   printf("\n\n# Key Generation\n\n");
-  execute_key_generation(parties, num_parties);
+  execute_key_generation(party);
 
-  printf("\n\n# Refrsh and Auxliarty Information\n\n");
-  execute_refresh_and_aux_info(parties, num_parties);
+  // printf("\n\n# Refrsh and Auxliarty Information\n\n");
+  // execute_refresh_and_aux_info(parties, num_parties);
 
-  printf("\n\n# Pre-Signing\n\n");
-  execute_presigning(parties, num_parties);
+  // printf("\n\n# Pre-Signing\n\n");
+  // execute_presigning(parties, num_parties);
 
-  printf("\n\n# Signing\n\n");
-  execute_signing(parties, num_parties);
+  // printf("\n\n# Signing\n\n");
+  // execute_signing(parties, num_parties);
 
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_party_free(parties[i]);
+  cmp_party_free(party);
+  free(party_ids);
 }

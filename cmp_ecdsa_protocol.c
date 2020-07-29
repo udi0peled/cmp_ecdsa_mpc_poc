@@ -13,7 +13,7 @@ extern int PRINT_VALUES;
 
 /********************************************
  *
- *   Communication Channels
+ *   Auxiliary Functions
  * 
  ********************************************/
 
@@ -55,11 +55,19 @@ void cmp_comm_receive_bytes(uint64_t from_index, uint64_t my_index, uint64_t rou
   sem_unlink(filename);
 }
 
-/********************************************
- *
- *   Party Context for Protocol Execution
- * 
- ********************************************/
+void cmp_void_to_bytes(uint8_t **to_bytes, const void *from_bytes, uint64_t byte_len, int move_to_end)
+{
+  if ((!to_bytes) || (!*to_bytes) || (!from_bytes)) return;
+  memcpy(*to_bytes, from_bytes, byte_len);
+  if (move_to_end) *to_bytes += byte_len;
+}
+
+void cmp_void_from_bytes(void *to_bytes, uint8_t **from_bytes, uint64_t byte_len, int move_to_end)
+{
+  if ((!from_bytes) || (!*from_bytes) || (!to_bytes)) return;
+  memcpy(to_bytes, *from_bytes, byte_len);
+  if (move_to_end) *from_bytes += byte_len;
+}
 
 void cmp_sample_bytes (uint8_t *rand_bytes, uint64_t byte_len)
 {
@@ -72,6 +80,7 @@ void cmp_sample_bytes (uint8_t *rand_bytes, uint64_t byte_len)
  * 
  ********************************************/
 
+// Set sid hash from relevant existing party values
 void cmp_set_sid_hash(cmp_party_t *party)
 {
   SHA512_CTX sha_ctx;
@@ -112,15 +121,15 @@ void cmp_set_sid_hash(cmp_party_t *party)
   SHA512_Final(party->sid_hash, &sha_ctx);
 }
 
-void cmp_party_new (cmp_party_t **parties, uint64_t num_parties, const uint64_t *parties_ids, uint64_t index, const hash_chunk sid)
+cmp_party_t *cmp_party_new (uint64_t party_index, uint64_t num_parties, const uint64_t *parties_ids, const hash_chunk sid)
 {
   cmp_party_t *party = malloc(sizeof(*party));
   
-  parties[index] = party;
-  party->parties = parties;
+  //parties[index] = party;
+  //party->parties = parties;
   
-  party->id = parties_ids[index];
-  party->index = index;
+  party->id = parties_ids[party_index];
+  party->index = party_index;
   party->num_parties = num_parties;
   party->parties_ids = calloc(num_parties, sizeof(uint64_t));
   
@@ -139,7 +148,8 @@ void cmp_party_new (cmp_party_t **parties, uint64_t num_parties, const uint64_t 
   party->k   = scalar_new();
   party->chi = scalar_new();
 
-  // The initialization of the following infulences sid_hash, so init to NULL untill set later.
+  // The initialization of the following values infulences sid_hash.
+  // So initialize to NULL untill set later, to reset sid_hash
   memcpy(party->sid, sid, sizeof(hash_chunk));
   memset(party->srid, 0x00, sizeof(hash_chunk));
   for (uint64_t i = 0; i < num_parties; ++i)
@@ -151,9 +161,11 @@ void cmp_party_new (cmp_party_t **parties, uint64_t num_parties, const uint64_t 
   }
   cmp_set_sid_hash(party);
 
-  party->key_generation_data   = NULL;
+  party->key_generation_data = NULL;
   party->refresh_data = NULL;
   party->presigning_data = NULL;
+
+  return party;
 }
 
 void cmp_party_free (cmp_party_t *party)
@@ -184,52 +196,74 @@ void cmp_party_free (cmp_party_t *party)
  * 
  ***********************/
 
+void cmp_key_generation_payload_init(cmp_party_t *party, cmp_key_generation_payload_t *payload)
+{
+  payload->commited_A = group_elem_new(party->ec);
+  payload->public_X = group_elem_new(party->ec);
+  payload->psi_sch = zkp_schnorr_new();
+}
+
 void cmp_key_generation_init(cmp_party_t *party)
 {
-  cmp_key_generation_t *kgd = malloc(sizeof(*party->key_generation_data));
+  cmp_key_generation_data_t *kgd = malloc(sizeof(cmp_key_generation_data_t));
   party->key_generation_data = kgd;
 
   kgd->secret_x = scalar_new();
-  kgd->public_X = group_elem_new(party->ec);
-
   kgd->tau = scalar_new();
-  kgd->psi = zkp_schnorr_new();
-  kgd->aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL); // prepeare for (sid_hash, i, srid)
+  kgd->aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);     // prepeare for (sid_hash, i, srid)
+
+  kgd->payload = calloc(party->num_parties, sizeof(cmp_key_generation_payload_t *));
+
+  for (uint64_t i = 0; i < party->num_parties; ++i)
+  { 
+    kgd->payload[i] = malloc(sizeof(cmp_key_generation_payload_t));
+    cmp_key_generation_payload_init(party, kgd->payload[i]);
+  }
 
   kgd->run_time = 0;
 }
 
+void cmp_key_generation_payload_clean(cmp_key_generation_payload_t *payload)
+{
+  zkp_schnorr_free(payload->psi_sch);
+  group_elem_free(payload->public_X);
+  group_elem_free(payload->commited_A);
+  free(payload);
+}
+
 void cmp_key_generation_clean(cmp_party_t *party)
 {
-  cmp_key_generation_t *kgd = party->key_generation_data;
+  cmp_key_generation_data_t *kgd = party->key_generation_data;
 
   zkp_aux_info_free(kgd->aux);
-  zkp_schnorr_free(kgd->psi);
   scalar_free(kgd->tau);
   scalar_free(kgd->secret_x);
-  group_elem_free(kgd->public_X);
 
+  for (uint64_t i = 0; i < party->num_parties; ++i)
+  { 
+    cmp_key_generation_payload_clean(kgd->payload[i]);
+  }
+
+  free(kgd->payload);
   free(kgd);
 }
 
-void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, uint64_t party_id, const cmp_party_t *party)
+void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, uint64_t party_id, const cmp_key_generation_payload_t *kgp, const ec_group_t ec)
 {
-  cmp_key_generation_t *kgd = party->key_generation_data;
-
   uint8_t *temp_bytes = malloc(GROUP_ELEMENT_BYTES);
 
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
   SHA512_Update(&sha_ctx, sid_hash, sizeof(hash_chunk));
   SHA512_Update(&sha_ctx, &party_id, sizeof(uint64_t));
-  SHA512_Update(&sha_ctx, kgd->srid, sizeof(hash_chunk));
+  SHA512_Update(&sha_ctx, kgp->srid, sizeof(hash_chunk));
   
-  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgd->public_X, party->ec, 0);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgp->public_X, ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgd->psi->proof.A, party->ec, 0);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgp->commited_A, ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-  SHA512_Update(&sha_ctx, kgd->u, sizeof(hash_chunk));
+  SHA512_Update(&sha_ctx, kgp->u, sizeof(hash_chunk));
   SHA512_Final(V, &sha_ctx);
   
   free(temp_bytes);
@@ -240,27 +274,48 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_key_generation_t *kgd = party->key_generation_data;
+  cmp_key_generation_data_t *kgd = party->key_generation_data;
+  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
 
   scalar_sample_in_range(kgd->secret_x, party->ec_order, 0);
-  group_operation(kgd->public_X, NULL, party->ec_gen, kgd->secret_x, party->ec);
+  group_operation(kgp->public_X, NULL, party->ec_gen, kgd->secret_x, party->ec);
 
-  kgd->psi->public.G = party->ec;
-  kgd->psi->public.g = party->ec_gen;
-  zkp_schnorr_commit(kgd->psi, kgd->tau);
+  kgp->psi_sch->public.G = party->ec;
+  kgp->psi_sch->public.g = party->ec_gen;
+  zkp_schnorr_commit(kgp->psi_sch, kgd->tau);
+  group_elem_copy(kgp->commited_A, kgp->psi_sch->proof.A);
 
-  cmp_sample_bytes(kgd->srid, sizeof(hash_chunk));
-  cmp_sample_bytes(kgd->u, sizeof(hash_chunk));
-  cmp_key_generation_round_1_commit(kgd->V, party->sid, party->id, party);
+  cmp_sample_bytes(kgp->srid, sizeof(hash_chunk));
+  cmp_sample_bytes(kgp->u, sizeof(hash_chunk));
+  cmp_key_generation_round_1_commit(kgp->V, party->sid, party->id, kgp, party->ec);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
 
-  printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + sizeof(hash_chunk), time_diff);
+  // Send payload to parties
+
+  uint64_t send_bytes_len = sizeof(hash_chunk);
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  cmp_void_to_bytes(&curr_send, kgp->V, sizeof(hash_chunk), 1);
   
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_send_bytes(party->index, j, 1, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms\n", party->id, send_bytes_len, time_diff);
+  
+  // Print
+
   if (!PRINT_VALUES) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
-  printf("V_%lu = ", party->index); printHexBytes("0x", kgd->V, sizeof(hash_chunk), "\n", 0);
+  printf("V_%lu = ", party->index); printHexBytes("0x", kgp->V, sizeof(hash_chunk), "\n", 0);
 }
 
 void  cmp_key_generation_round_2_exec (cmp_party_t *party)
@@ -268,26 +323,69 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_key_generation_t *kgd = party->key_generation_data;
+  cmp_key_generation_data_t *kgd = party->key_generation_data;
+  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
+
+  // Receive payloads from parties
+
+  uint64_t recv_bytes_len = sizeof(hash_chunk);
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv;
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_receive_bytes(j, party->index, 1, recv_bytes, recv_bytes_len);
+    
+    curr_recv = recv_bytes;
+    cmp_void_from_bytes(kgd->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
+
+    assert(curr_recv == recv_bytes + recv_bytes_len);
+  }
+  free(recv_bytes);
 
   // Echo broadcast - Send hash of all V_i commitments
+
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
-  for (uint64_t i = 0; i < party->num_parties; ++i) SHA512_Update(&sha_ctx, party->parties[i]->key_generation_data->V, sizeof(hash_chunk));
-  SHA512_Final(kgd->echo_broadcast, &sha_ctx);
+  for (uint64_t i = 0; i < party->num_parties; ++i) SHA512_Update(&sha_ctx, kgd->payload[i]->V, sizeof(hash_chunk));
+  SHA512_Final(kgp->echo_broadcast, &sha_ctx);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
 
-  printf("### Round 2. Party %lu publishes (sid, i, srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", party->id, 
-    2*sizeof(uint64_t) + 4*sizeof(hash_chunk) + 2*GROUP_ELEMENT_BYTES, time_diff);
+  // Send payload to parties
+
+  uint64_t send_bytes_len = 3*sizeof(hash_chunk) + 2*GROUP_ELEMENT_BYTES;
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  cmp_void_to_bytes(&curr_send, kgp->u, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, kgp->srid, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, kgp->echo_broadcast, sizeof(hash_chunk), 1);
+  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgp->public_X, party->ec, 1);
+  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgp->commited_A, party->ec, 1);
   
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_send_bytes(party->index, j, 2, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  printf("### Round 2. Party %lu publishes (sid, i, srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", party->id, 
+    send_bytes_len, time_diff);
+  
+  // Print 
+
   if (!PRINT_VALUES) return;
-  printf("X_%lu = ", party->index); printECPOINT("", kgd->public_X, party->ec, "\n", 1);
-  printf("A_%lu = ", party->index); printECPOINT("", kgd->psi->proof.A, party->ec, "\n", 1);
-  printf("srid_%lu = ", party->index); printHexBytes("0x", kgd->srid, sizeof(hash_chunk), "\n", 0);
-  printf("u_%lu = ", party->index); printHexBytes("0x", kgd->u, sizeof(hash_chunk), "\n", 0);
-  printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgd->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+  printf("X_%lu = ", party->index); printECPOINT("", kgp->public_X, party->ec, "\n", 1);
+  printf("A_%lu = ", party->index); printECPOINT("", kgp->psi_sch->proof.A, party->ec, "\n", 1);
+  printf("srid_%lu = ", party->index); printHexBytes("0x", kgp->srid, sizeof(hash_chunk), "\n", 0);
+  printf("u_%lu = ", party->index); printHexBytes("0x", kgp->u, sizeof(hash_chunk), "\n", 0);
+  printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgp->echo_broadcast, sizeof(hash_chunk), "\n", 0);
 }
 
 void  cmp_key_generation_round_3_exec (cmp_party_t *party)
@@ -295,34 +393,60 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_key_generation_t *kgd = party->key_generation_data;
+  cmp_key_generation_data_t *kgd = party->key_generation_data;
+  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
+
+  // Receive payload from parties
+
+  uint64_t recv_bytes_len = 3*sizeof(hash_chunk) + 2*GROUP_ELEMENT_BYTES;
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv;
+  
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_receive_bytes(j, party->index, 2, recv_bytes, recv_bytes_len);
+
+    curr_recv = recv_bytes;
+    cmp_void_from_bytes(kgd->payload[j]->u, &curr_recv, sizeof(hash_chunk), 1);
+    cmp_void_from_bytes(kgd->payload[j]->srid, &curr_recv, sizeof(hash_chunk), 1);
+    cmp_void_from_bytes(kgd->payload[j]->echo_broadcast, &curr_recv, sizeof(hash_chunk), 1);
+    group_elem_from_bytes(kgd->payload[j]->public_X, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
+    group_elem_from_bytes(kgd->payload[j]->commited_A, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
+    
+    assert(curr_recv == recv_bytes + recv_bytes_len);
+  }
+  free(recv_bytes);
+
+  // Execute round
 
   int *verified_decomm = calloc(party->num_parties, sizeof(int));
   int *verified_echo = calloc(party->num_parties, sizeof(int));
 
   hash_chunk ver_data;
-  memcpy(party->srid, kgd->srid, sizeof(hash_chunk));
+  memcpy(party->srid, kgp->srid, sizeof(hash_chunk));
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
 
     // Verify commited V_i
-    cmp_key_generation_round_1_commit(ver_data, party->sid, party->parties_ids[j], party->parties[j]);
-    verified_decomm[j] = memcmp(ver_data, party->parties[j]->key_generation_data->V, sizeof(hash_chunk)) == 0;
+    cmp_key_generation_round_1_commit(ver_data, party->sid, party->parties_ids[j], kgd->payload[j], party->ec);
+    verified_decomm[j] = memcmp(ver_data, kgd->payload[j]->V, sizeof(hash_chunk)) == 0;
 
     // Verify echo broadcast of round 1 commitment -- ToDo: expand to identification of malicious party
-    verified_echo[j] = memcmp(kgd->echo_broadcast, party->parties[j]->key_generation_data->echo_broadcast, sizeof(hash_chunk)) == 0;
+    verified_echo[j] = memcmp(kgp->echo_broadcast, kgd->payload[j]->echo_broadcast, sizeof(hash_chunk)) == 0;
 
     // Set srid as xor of all party's srid_i
-    for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) party->srid[pos] ^= party->parties[j]->key_generation_data->srid[pos];
+    for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) party->srid[pos] ^= kgd->payload[j]->srid[pos];
   }
+
+  // Verification log
 
   for (uint64_t j = 0; j < party->num_parties; ++j){
     if (j == party->index) continue;
     if (verified_decomm[j] != 1) printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
     if (verified_echo[j] != 1)   printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
   }
-
   free(verified_decomm);
   free(verified_echo);
 
@@ -334,16 +458,35 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   assert(kgd->aux->info_len == aux_pos);
 
   // Set Schnorr ZKP public claim and secret, then prove
-  kgd->psi->public.X = kgd->public_X;
-  kgd->psi->secret.x = kgd->secret_x;
-  zkp_schnorr_prove(kgd->psi, kgd->aux, kgd->tau);
+  kgp->psi_sch->public.X = kgp->public_X;
+  kgp->psi_sch->secret.x = kgd->secret_x;
+  zkp_schnorr_prove(kgp->psi_sch, kgd->aux, kgd->tau);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
   
-  uint64_t psi_bytes;
-  zkp_schnorr_proof_to_bytes(NULL, &psi_bytes, NULL, 0);
-  printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + psi_bytes, time_diff);
+  // Send payload to parties
+
+  uint64_t psi_sch_byte_len;
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_byte_len, NULL, 0);
+  uint64_t send_bytes_len = psi_sch_byte_len;
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_byte_len, kgp->psi_sch, 1);
+  
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_send_bytes(party->index, j, 3, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+  
+  printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + psi_sch_byte_len, time_diff);
+
+  // Print
 
   if (!PRINT_VALUES) return;
   printHexBytes("combined srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
@@ -354,33 +497,66 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_key_generation_t *kgd = party->key_generation_data;
+  cmp_key_generation_data_t *kgd = party->key_generation_data;
 
-  int *verified_psi = calloc(party->num_parties, sizeof(int));
+  // Receive payload from parties
 
-  // Verify all Schnorr ZKP received from parties  
+  uint64_t psi_sch_byte_len;
+  zkp_schnorr_proof_from_bytes(NULL, NULL, &psi_sch_byte_len, 0);
+  uint64_t recv_bytes_len = psi_sch_byte_len;
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv = recv_bytes;
+
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    zkp_aux_info_update(kgd->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));     // Update i to commiting player
-    verified_psi[j] = zkp_schnorr_verify(party->parties[j]->key_generation_data->psi, kgd->aux)
-      && group_elem_equal(party->parties[j]->key_generation_data->psi->proof.A, party->parties[j]->key_generation_data->psi->proof.A, party->ec);      // Check A's of rounds 2 and 3
+    cmp_comm_receive_bytes(j, party->index, 3, recv_bytes, recv_bytes_len);
+
+    curr_recv = recv_bytes;
+    
+    kgd->payload[j]->psi_sch->public.G = party->ec;
+    kgd->payload[j]->psi_sch->public.g = party->ec_gen;
+    kgd->payload[j]->psi_sch->public.X = kgd->payload[j]->public_X;
+    zkp_schnorr_proof_from_bytes(kgd->payload[j]->psi_sch, &curr_recv, &psi_sch_byte_len, 1);
+
+    assert(curr_recv == recv_bytes + recv_bytes_len);
   }
+  free(recv_bytes);
+
+  // Execute round
+
+  int *verified_A   = calloc(party->num_parties, sizeof(int));
+  int *verified_psi = calloc(party->num_parties, sizeof(int));
+
+  // Verify all Schnorr ZKP received from parties  
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    
+    verified_A[j] = group_elem_equal(kgd->payload[j]->psi_sch->proof.A, kgd->payload[j]->commited_A, party->ec);
+
+    zkp_aux_info_update(kgd->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));              // Update i to commiting player
+    verified_psi[j] = zkp_schnorr_verify(kgd->payload[j]->psi_sch, kgd->aux);
+  }
+
+  // Verification log
 
   for (uint64_t j = 0; j < party->num_parties; ++j){
     if (j == party->index) continue;
-    if (verified_psi[j] != 1) printf("%sParty %lu: schnorr zkp (psi) failed verification from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_A[j] != 1) printf("%sParty %lu: schnorr zkp commited A (psi_sch.proof.A) different from previous round from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_psi[j] != 1) printf("%sParty %lu: schnorr zkp (psi_sch) failed verification from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
   }
-  
+  free(verified_A);
   free(verified_psi);
-
+  
   // Set party's values, and update sid_hash to include srid and public_X
   scalar_copy(party->secret_x, kgd->secret_x);
   //scalar_make_plus_minus(party->secret_x, party->ec_order);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (!party->public_X[j]) party->public_X[j] = group_elem_new(party->ec);
-    group_elem_copy(party->public_X[j], party->parties[j]->key_generation_data->public_X);
+    group_elem_copy(party->public_X[j], kgd->payload[j]->public_X);
   }
   cmp_set_sid_hash(party);
   
@@ -669,16 +845,16 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
   
-  uint64_t psi_sch_bytes;
+  uint64_t psi_sch_byte_len;
   uint64_t psi_rped_bytes;
   uint64_t psi_mod_bytes;
-  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytes, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_byte_len, NULL, 0);
   zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytes, NULL, 0);
   zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytes, NULL, 0);
 
 
   printf("### Round 3. Party %lu publishes (sid, i, psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", party->id, 
-    2*sizeof(uint64_t) + psi_mod_bytes + psi_rped_bytes + (party->num_parties-1)*psi_sch_bytes + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
+    2*sizeof(uint64_t) + psi_mod_bytes + psi_rped_bytes + (party->num_parties-1)*psi_sch_byte_len + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
 
   if (!PRINT_VALUES) return;
   printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);

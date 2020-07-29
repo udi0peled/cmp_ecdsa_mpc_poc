@@ -181,18 +181,25 @@ int main(int argc, char* argv[])
 { 
   int print_values = 0;
   uint64_t num_parties = 2;
+  uint64_t party_index;
+
   uint64_t modulus_bits = 1024;
 
   if (argc >= 2)
   {
     if (strcmp(argv[1], "cmp") == 0) 
     {
+      if (argc <= 2) goto USAGE;
+
+      // Must have party index
+      party_index = strtoul(argv[2], NULL, 10);
+
       // Testing the protocol 
 
-      if (argc >= 3)
+      if (argc >= 4)
       {
-        num_parties = strtoul(argv[2], NULL, 10);
-        if (argc >= 4) print_values = strcmp(argv[3], "0") != 0;
+        num_parties = strtoul(argv[3], NULL, 10);
+        if (argc >= 5) print_values = strcmp(argv[4], "0") != 0;
       }
 
       printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
@@ -208,8 +215,10 @@ int main(int argc, char* argv[])
       // printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
       // printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
 
-      printf("### Executing protocol for %lu parties\n", num_parties);
-      test_protocol(num_parties, print_values);
+      printf("\n### Party %lu executing protocol, out of %lu parties\n", party_index, num_parties);
+      
+      test_protocol(party_index, num_parties, print_values);
+
       return 0;
     }
     else if (strcmp(argv[1], "paillier") == 0)
@@ -260,8 +269,9 @@ int main(int argc, char* argv[])
     
   }
 
+USAGE:
   printf("\nUsage options:\n");
-  printf("%s cmp <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
+  printf("%s cmp <party_index> <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
   printf("%s paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
   //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
 

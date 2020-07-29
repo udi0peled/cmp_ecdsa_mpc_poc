@@ -5,7 +5,7 @@ zkp_schnorr_t *zkp_schnorr_new()
 {
   zkp_schnorr_t *zkp = malloc(sizeof(*zkp));
   
-  zkp->proof.A = NULL;            // group elements are created when proving
+  zkp->proof.A = NULL;            // group elements are created upon usage
   zkp->proof.z = scalar_new();
 
   return zkp;
@@ -22,7 +22,7 @@ void zkp_schnorr_free (zkp_schnorr_t *zkp)
 
 void zkp_schnorr_commit (zkp_schnorr_t *zkp, scalar_t alpha)
 {
-  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);      // group elements are allocated while proving/commiting
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);      // group elements are allocated upon usage
 
   scalar_sample_in_range(alpha, ec_group_order(zkp->public.G), 0);
   group_operation(zkp->proof.A, NULL, zkp->public.g, alpha, zkp->public.G);
@@ -117,6 +117,7 @@ void zkp_schnorr_proof_from_bytes (zkp_schnorr_t *zkp, uint8_t **bytes, uint64_t
   
   uint8_t *read_bytes = *bytes;
   
+  if (!zkp->proof.A) zkp->proof.A = group_elem_new(zkp->public.G);                          // group elements are allocated upon usage
   group_elem_from_bytes(zkp->proof.A, &read_bytes, GROUP_ELEMENT_BYTES, zkp->public.G, 1);
   scalar_from_bytes(zkp->proof.z, &read_bytes, GROUP_ORDER_BYTES, 1);
 
