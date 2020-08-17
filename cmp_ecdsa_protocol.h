@@ -48,23 +48,23 @@
 
 #include "primitives.h"
 
-// Random Oracle input and output size (SHA512).
-#define KAPPA_RANDOM_ORACLE_BYTES 64
+// Random Oracle input and output byte size (SHA512).
+typedef uint8_t hash_chunk[64];
 
-typedef uint8_t hash_chunk[KAPPA_RANDOM_ORACLE_BYTES];
 
-/**
- *  Key generation phase
- */
+/****************************** 
+ * 
+ *    Key Generation Phase
+ * 
+ ******************************/
 
-// Payload Received from other parties
-
+// Payload received from other parties
 typedef struct 
 {
   // Public key share
   gr_elem_t public_X;
 
-  // Schnorr ZKP payload
+  // Schnorr ZKP 
   gr_elem_t       commited_A;
   zkp_schnorr_t   *psi_sch;
 
@@ -79,51 +79,95 @@ typedef struct
 // Data generated, and payload received from others (including sent payload)
 typedef struct 
 {
-  // Private key share
+  // Private.Pוublic key share
   scalar_t  secret_x;
+  gr_elem_t public_X;
 
-  // ZKP Schnorr data
-  zkp_aux_info_t  *aux;
-  scalar_t        tau;
-  
+  // ZKP Schnorr
+  scalar_t      tau;
+  gr_elem_t     commited_A;
+  zkp_schnorr_t *psi_sch;
+
+  // Echo broadcast and random oracle data seed
+  uint8_t *srid;
+  uint8_t *u;
+  uint8_t *V;
+  uint8_t *echo_broadcast;
+
   // Recevied KGD payload of all parties (including self to send)
   cmp_key_generation_payload_t **payload;
 
   uint64_t run_time;
+
 } cmp_key_generation_data_t;
 
-/**
- *  Temporary data for refresh auxiliary infromation phase
- */
 
+/************************************************** 
+ * 
+ *   Key and Auxiliary Information Refresh Phase
+ * 
+ **************************************************/
+
+// Payloads received from each party during phase
 typedef struct 
 {
   // Generated paillier and ring pedersen keys
+  paillier_public_key_t  *paillier_pub;
+  ring_pedersen_public_t *rped_pub;
+
+  // Resharing the same secret, and paillier commitments of shares
+  scalar_t  *encrypted_reshare_k;
+  gr_elem_t *reshare_public_X_k;
+  
+  // ZKP data
+  gr_elem_t                   *commited_A_k;
+  zkp_schnorr_t               **psi_sch_k;
+  zkp_paillier_blum_modulus_t *psi_mod;
+  zkp_ring_pedersen_param_t   *psi_rped;
+
+  // Echo broadcast and random oracle data seed
+  hash_chunk rho;
+  hash_chunk u;
+  hash_chunk V;
+  hash_chunk echo_broadcast;
+
+} cmp_refresh_payload_t;
+
+// Data generated (and partially sent) by party during phase
+typedef struct 
+{
+  // Paillier and ring pedersen keys
   paillier_private_key_t  *paillier_priv;
+  paillier_public_key_t  *paillier_pub;
   ring_pedersen_private_t *rped_priv;
+  ring_pedersen_public_t *rped_pub;
 
   // Resharing the same secret, and paillier commitments of shares
   scalar_t  *reshare_secret_x_j;
   scalar_t  *encrypted_reshare_j;
   gr_elem_t *reshare_public_X_j;
   
-  // ZKP data
-  zkp_aux_info_t              *aux;
-  scalar_t                    *tau;
-  zkp_schnorr_t               **psi_sch;
+  // All ZKP
+  scalar_t                    *tau_j;
+  gr_elem_t                   *commited_A_j;
+  zkp_schnorr_t               **psi_sch_j;
   zkp_paillier_blum_modulus_t *psi_mod;
   zkp_ring_pedersen_param_t   *psi_rped;
 
   // Echo broadcast and random oracle data seed
-  hash_chunk rho;
   hash_chunk combined_rho;
-  hash_chunk u;
-  hash_chunk V;
-  hash_chunk echo_broadcast;
+  uint8_t *rho;
+  uint8_t *u;
+  uint8_t *V;
+  uint8_t *echo_broadcast;
+
+  // Payload from other parties 
+  cmp_refresh_payload_t **payload;
 
   uint64_t prime_time;
   uint64_t run_time;
-} cmp_refresh_aux_info_t;
+
+} cmp_refresh_data_t;
 
 /**
  *  Temporary data for presigning phase
@@ -198,7 +242,7 @@ typedef struct cmp_party_t
 
   // Temporary data for relevant phase
   cmp_key_generation_data_t *key_generation_data;
-  cmp_refresh_aux_info_t    *refresh_data;
+  cmp_refresh_data_t    *refresh_data;
   cmp_presigning_t          *presigning_data;
 
   // Generated signature share

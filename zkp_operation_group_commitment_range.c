@@ -269,6 +269,8 @@ void zkp_operation_group_commitment_range_proof_to_bytes(uint8_t **bytes, uint64
 
 void zkp_operation_group_commitment_range_proof_from_bytes(zkp_operation_group_commitment_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end)
 {
+  if (!zkp->proof.B_x) zkp->proof.B_x = group_elem_new(zkp->public.G);
+  
   uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + 6*RING_PED_MODULUS_BYTES + 6*PAILLIER_MODULUS_BYTES + 3*x_range_bytes + y_range_bytes + 4*EPS_ZKP_SLACK_PARAMETER_BYTES;
 
   if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))

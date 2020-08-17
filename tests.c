@@ -135,7 +135,8 @@ void test_paillier_operations(const paillier_private_key_t *priv)
   scalar_t ciphertext = scalar_new();
   scalar_t decrypted = scalar_new();
 
-  paillier_public_key_t *pub = paillier_encryption_copy_public(priv);
+  paillier_public_key_t *pub = paillier_encryption_public_new();
+  paillier_encryption_copy_keys(NULL, pub, priv, NULL);
   
   scalar_sample_in_range(plaintext, pub->N , 0);
   printBIGNUM("plaintext = ", plaintext, "\n");
@@ -175,8 +176,10 @@ void test_ring_pedersen(const scalar_t p, const scalar_t q)
 {
   printf("# test_ring_pedersen\n");
 
-  ring_pedersen_private_t *rped_priv = ring_pedersen_param_from_primes(p, q);
-  ring_pedersen_public_t *rped_pub = ring_pedersen_copy_public(rped_priv);
+  ring_pedersen_private_t *rped_priv = ring_pedersen_private_new();
+  ring_pedersen_public_t *rped_pub = ring_pedersen_public_new();
+  ring_pedersen_private_from_primes(rped_priv, p, q);
+  ring_pedersen_copy_param(NULL, rped_pub, rped_priv, NULL);
 
   printBIGNUM("N = ", (rped_pub->N), "\n");
   printBIGNUM("s = ", (rped_pub->s), "\n");
@@ -384,15 +387,15 @@ void execute_key_generation (cmp_party_t *party)
   cmp_key_generation_clean(party);
 }
 
-void execute_refresh_and_aux_info (cmp_party_t *parties[], uint64_t num_parties)
+void execute_refresh_and_aux_info (cmp_party_t *party)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_init(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_final_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_refresh_aux_info_clean(parties[i]);
+  cmp_refresh_aux_info_init(party);
+  cmp_refresh_aux_info_round_1_exec(party);
+  cmp_refresh_aux_info_round_2_exec(party);
+  cmp_refresh_aux_info_round_3_exec(party);
+  cmp_refresh_aux_info_final_exec(party);
+  cmp_refresh_aux_info_clean(party);
 }
 
 void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[], uint64_t num_parties)
@@ -417,12 +420,12 @@ void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[], uint64_t num_parti
 void execute_presigning (cmp_party_t *parties[], uint64_t num_parties)
 {
   // Execute Key Generation for all
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_init(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_1_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_2_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_3_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_final_exec(parties[i]);
-  for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_clean(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_init(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_1_exec(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_2_exec(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_round_3_exec(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_final_exec(parties[i]);
+  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presigning_clean(parties[i]);
 }
 
 int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
@@ -465,7 +468,7 @@ void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
   for (uint64_t i = 0; i < num_parties; ++i)
   {
     r[i] = scalar_new();
-    cmp_signature_share(r[i], sigma, parties[i], msg);
+    //cmp_signature_share(r[i], sigma, parties[i], msg);
     scalar_add(s, s, sigma, parties[i]->ec_order);
     assert(scalar_equal(r[0], r[i]));
   }
@@ -490,11 +493,11 @@ void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
   group_elem_free(pubkey);
 }
 
-int PRINT_VALUES;
+int PRINT_SECRETS;
 
-void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values)
+void test_protocol(uint64_t party_index, uint64_t num_parties, int print_secrets)
 {
-  PRINT_VALUES = print_values;
+  PRINT_SECRETS = print_secrets;
 
   hash_chunk  sid = "Fireblocks";
   uint64_t    *party_ids = calloc(num_parties, sizeof(uint64_t));
@@ -509,8 +512,8 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values)
   printf("\n\n# Key Generation\n\n");
   execute_key_generation(party);
 
-  // printf("\n\n# Refrsh and Auxliarty Information\n\n");
-  // execute_refresh_and_aux_info(parties, num_parties);
+  printf("\n\n# Refrsh and Auxliarty Information\n\n");
+  execute_refresh_and_aux_info(party);
 
   // printf("\n\n# Pre-Signing\n\n");
   // execute_presigning(parties, num_parties);

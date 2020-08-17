@@ -27,8 +27,11 @@ typedef struct
 
 typedef struct 
 {
-  paillier_public_key_t pub;
+  // Public
+  scalar_t N;
+  scalar_t N2;
 
+  // Private
   scalar_t p;
   scalar_t q;
   scalar_t phi_N;              // exponent in decryption
@@ -36,17 +39,23 @@ typedef struct
 } paillier_private_key_t;
 
 
-paillier_private_key_t *paillier_encryption_generate_key  (uint64_t prime_bits);
-paillier_private_key_t *paillier_encryption_duplicate_key (const paillier_private_key_t *priv);
-paillier_public_key_t  *paillier_encryption_copy_public   (const paillier_private_key_t *priv);
+paillier_private_key_t *
+     paillier_encryption_private_new      ();
+paillier_public_key_t *
+     paillier_encryption_public_new       ();
+void paillier_encryption_generate_private (paillier_private_key_t *priv, uint64_t prime_bits);
+// If pub==NULL and priv!=NULL, copy_pub from priv
+void paillier_encryption_copy_keys        (paillier_private_key_t *copy_priv, paillier_public_key_t *copy_pub, const paillier_private_key_t *priv, const paillier_public_key_t *pub);
 // Free keys, each can be NULL and ignored. Public inside private is freed with private, shouldn't be freeed seperately
-void                    paillier_encryption_free_keys     (paillier_private_key_t *priv, paillier_public_key_t *pub);
+void paillier_encryption_free_keys        (paillier_private_key_t *priv, paillier_public_key_t *pub);
 // Sample randomness to be used in encryption
-void                    paillier_encryption_sample        (scalar_t rho, const paillier_public_key_t *pub);
-void                    paillier_encryption_encrypt       (scalar_t ciphertext, const scalar_t plaintext, const scalar_t rho, const paillier_public_key_t *pub);
+void paillier_encryption_sample           (scalar_t rho, const paillier_public_key_t *pub);
+void paillier_encryption_encrypt          (scalar_t ciphertext, const scalar_t plaintext, const scalar_t rho, const paillier_public_key_t *pub);
 // Doesn't check cipher text is coprime to paillier modulus
-void                    paillier_encryption_decrypt       (scalar_t plaintext, const scalar_t ciphertext, const paillier_private_key_t *priv);
+void paillier_encryption_decrypt          (scalar_t plaintext, const scalar_t ciphertext, const paillier_private_key_t *priv);
 // Computed ciphertext*factor + add_cipher (with paillier homomorphic operations). factor==NULL used as 1. add_cipher==NULL, assume as 0.
-void                    paillier_encryption_homomorphic   (scalar_t new_cipher, const scalar_t ciphertext, const scalar_t factor, const scalar_t add_cipher, const paillier_public_key_t *pub);       
+void paillier_encryption_homomorphic      (scalar_t new_cipher, const scalar_t ciphertext, const scalar_t factor, const scalar_t add_cipher, const paillier_public_key_t *pub);       
+void paillier_public_to_bytes             (uint8_t **bytes, uint64_t *byte_len, const paillier_public_key_t *pub, uint64_t paillier_modulus_bytes, int move_to_end);
+void paillier_public_from_bytes           (paillier_public_key_t *pub, uint8_t **bytes, uint64_t *byte_len, uint64_t paillier_modulus_bytes, int move_to_end);
 
 #endif

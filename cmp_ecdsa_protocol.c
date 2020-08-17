@@ -9,7 +9,7 @@
 #include <semaphore.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
-extern int PRINT_VALUES;
+extern int PRINT_SECRETS;
 
 /********************************************
  *
@@ -152,12 +152,14 @@ cmp_party_t *cmp_party_new (uint64_t party_index, uint64_t num_parties, const ui
   // So initialize to NULL untill set later, to reset sid_hash
   memcpy(party->sid, sid, sizeof(hash_chunk));
   memset(party->srid, 0x00, sizeof(hash_chunk));
+
+  party->paillier_priv = paillier_encryption_private_new();
   for (uint64_t i = 0; i < num_parties; ++i)
   {
     party->parties_ids[i]  = parties_ids[i];
-    party->public_X[i]     = NULL;
-    party->paillier_pub[i] = NULL;
-    party->rped_pub[i]     = NULL; 
+    party->public_X[i]     = group_elem_new(party->ec);;
+    party->paillier_pub[i] = paillier_encryption_public_new();
+    party->rped_pub[i]     = ring_pedersen_public_new(); 
   }
   cmp_set_sid_hash(party);
 
@@ -196,59 +198,54 @@ void cmp_party_free (cmp_party_t *party)
  * 
  ***********************/
 
-void cmp_key_generation_payload_init(cmp_party_t *party, cmp_key_generation_payload_t *payload)
-{
-  payload->commited_A = group_elem_new(party->ec);
-  payload->public_X = group_elem_new(party->ec);
-  payload->psi_sch = zkp_schnorr_new();
-}
-
 void cmp_key_generation_init(cmp_party_t *party)
 {
   cmp_key_generation_data_t *kgd = malloc(sizeof(cmp_key_generation_data_t));
   party->key_generation_data = kgd;
 
-  kgd->secret_x = scalar_new();
-  kgd->tau = scalar_new();
-  kgd->aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);     // prepeare for (sid_hash, i, srid)
-
   kgd->payload = calloc(party->num_parties, sizeof(cmp_key_generation_payload_t *));
-
-  for (uint64_t i = 0; i < party->num_parties; ++i)
+  for (uint64_t j = 0; j < party->num_parties; ++j)
   { 
-    kgd->payload[i] = malloc(sizeof(cmp_key_generation_payload_t));
-    cmp_key_generation_payload_init(party, kgd->payload[i]);
+    kgd->payload[j] = malloc(sizeof(cmp_key_generation_payload_t));
+    kgd->payload[j]->commited_A = group_elem_new(party->ec);
+    kgd->payload[j]->public_X = group_elem_new(party->ec);
+    kgd->payload[j]->psi_sch = zkp_schnorr_new();
   }
 
-  kgd->run_time = 0;
-}
+  kgd->secret_x = scalar_new();
+  kgd->tau      = scalar_new();
+  
+  // Point to values stored in payload (to be sent)
+  kgd->public_X       = kgd->payload[party->index]->public_X;
+  kgd->commited_A     = kgd->payload[party->index]->commited_A;
+  kgd->psi_sch        = kgd->payload[party->index]->psi_sch;
+  kgd->srid           = kgd->payload[party->index]->srid;
+  kgd->u              = kgd->payload[party->index]->u;
+  kgd->V              = kgd->payload[party->index]->V;
+  kgd->echo_broadcast = kgd->payload[party->index]->echo_broadcast;
 
-void cmp_key_generation_payload_clean(cmp_key_generation_payload_t *payload)
-{
-  zkp_schnorr_free(payload->psi_sch);
-  group_elem_free(payload->public_X);
-  group_elem_free(payload->commited_A);
-  free(payload);
+  kgd->run_time = 0;
 }
 
 void cmp_key_generation_clean(cmp_party_t *party)
 {
   cmp_key_generation_data_t *kgd = party->key_generation_data;
 
-  zkp_aux_info_free(kgd->aux);
   scalar_free(kgd->tau);
   scalar_free(kgd->secret_x);
 
-  for (uint64_t i = 0; i < party->num_parties; ++i)
+  for (uint64_t j = 0; j < party->num_parties; ++j)
   { 
-    cmp_key_generation_payload_clean(kgd->payload[i]);
+    zkp_schnorr_free(kgd->payload[j]->psi_sch);
+    group_elem_free(kgd->payload[j]->public_X);
+    group_elem_free(kgd->payload[j]->commited_A);
+    free(kgd->payload[j]);
   }
-
   free(kgd->payload);
   free(kgd);
 }
 
-void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, uint64_t party_id, const cmp_key_generation_payload_t *kgp, const ec_group_t ec)
+void cmp_key_generation_round_1_commit(hash_chunk commit_digest, const hash_chunk sid_hash, uint64_t party_id, const ec_group_t ec, const cmp_key_generation_payload_t *kg_payload)
 {
   uint8_t *temp_bytes = malloc(GROUP_ELEMENT_BYTES);
 
@@ -256,38 +253,40 @@ void cmp_key_generation_round_1_commit(hash_chunk V, const hash_chunk sid_hash, 
   SHA512_Init(&sha_ctx);
   SHA512_Update(&sha_ctx, sid_hash, sizeof(hash_chunk));
   SHA512_Update(&sha_ctx, &party_id, sizeof(uint64_t));
-  SHA512_Update(&sha_ctx, kgp->srid, sizeof(hash_chunk));
+  SHA512_Update(&sha_ctx, kg_payload->srid, sizeof(hash_chunk));
   
-  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgp->public_X, ec, 0);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kg_payload->public_X, ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kgp->commited_A, ec, 0);
+  group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, kg_payload->commited_A, ec, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-  SHA512_Update(&sha_ctx, kgp->u, sizeof(hash_chunk));
-  SHA512_Final(V, &sha_ctx);
+  SHA512_Update(&sha_ctx, kg_payload->u, sizeof(hash_chunk));
+  SHA512_Final(commit_digest, &sha_ctx);
   
   free(temp_bytes);
 }
 
 void  cmp_key_generation_round_1_exec (cmp_party_t *party)
 {
+  printf("### KeyGen Phase, Round 1, Party %lu.\n", party->index);
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
-  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
 
   scalar_sample_in_range(kgd->secret_x, party->ec_order, 0);
-  group_operation(kgp->public_X, NULL, party->ec_gen, kgd->secret_x, party->ec);
+  group_operation(kgd->public_X, NULL, party->ec_gen, kgd->secret_x, party->ec);
 
-  kgp->psi_sch->public.G = party->ec;
-  kgp->psi_sch->public.g = party->ec_gen;
-  zkp_schnorr_commit(kgp->psi_sch, kgd->tau);
-  group_elem_copy(kgp->commited_A, kgp->psi_sch->proof.A);
+  kgd->psi_sch->public.G = party->ec;
+  kgd->psi_sch->public.g = party->ec_gen;
+  zkp_schnorr_commit(kgd->psi_sch, kgd->tau);
+  group_elem_copy(kgd->commited_A, kgd->psi_sch->proof.A);
 
-  cmp_sample_bytes(kgp->srid, sizeof(hash_chunk));
-  cmp_sample_bytes(kgp->u, sizeof(hash_chunk));
-  cmp_key_generation_round_1_commit(kgp->V, party->sid, party->id, kgp, party->ec);
+  cmp_sample_bytes(kgd->srid, sizeof(hash_chunk));
+  cmp_sample_bytes(kgd->u, sizeof(hash_chunk));
+
+  cmp_key_generation_round_1_commit(kgd->V, party->sid, party->id, party->ec, kgd->payload[party->index]);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
@@ -298,7 +297,7 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
-  cmp_void_to_bytes(&curr_send, kgp->V, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, kgd->V, sizeof(hash_chunk), 1);
   
   assert(curr_send == send_bytes + send_bytes_len);
 
@@ -309,22 +308,22 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   }
   free(send_bytes);
 
-  printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms\n", party->id, send_bytes_len, time_diff);
-  
   // Print
 
-  if (!PRINT_VALUES) return;
+  printf("Broadcast (V_i).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
-  printf("V_%lu = ", party->index); printHexBytes("0x", kgp->V, sizeof(hash_chunk), "\n", 0);
+  printf("V_%lu = ", party->index); printHexBytes("0x", kgd->V, sizeof(hash_chunk), "\n", 0);
+
+  if (!PRINT_SECRETS) return;
+  printf("x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
 }
 
 void  cmp_key_generation_round_2_exec (cmp_party_t *party)
 {
-  clock_t time_start = clock();
-  uint64_t time_diff;
+  printf("### KeyGen Phase, Round 2. Party %lu.\n", party->index);
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
-  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
 
   // Receive payloads from parties
 
@@ -336,20 +335,28 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
     cmp_comm_receive_bytes(j, party->index, 1, recv_bytes, recv_bytes_len);
-    
     curr_recv = recv_bytes;
+
     cmp_void_from_bytes(kgd->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("V_%lu= ", j); printHexBytes("0x", kgd->payload[j]->V, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
+
+  // Execute
+
+  clock_t time_start = clock();
+  uint64_t time_diff;
 
   // Echo broadcast - Send hash of all V_i commitments
 
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
   for (uint64_t i = 0; i < party->num_parties; ++i) SHA512_Update(&sha_ctx, kgd->payload[i]->V, sizeof(hash_chunk));
-  SHA512_Final(kgp->echo_broadcast, &sha_ctx);
+  SHA512_Final(kgd->echo_broadcast, &sha_ctx);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
@@ -360,11 +367,11 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
-  cmp_void_to_bytes(&curr_send, kgp->u, sizeof(hash_chunk), 1);
-  cmp_void_to_bytes(&curr_send, kgp->srid, sizeof(hash_chunk), 1);
-  cmp_void_to_bytes(&curr_send, kgp->echo_broadcast, sizeof(hash_chunk), 1);
-  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgp->public_X, party->ec, 1);
-  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgp->commited_A, party->ec, 1);
+  cmp_void_to_bytes(&curr_send, kgd->u, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, kgd->srid, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, kgd->echo_broadcast, sizeof(hash_chunk), 1);
+  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgd->public_X, party->ec, 1);
+  group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, kgd->commited_A, party->ec, 1);
   
   assert(curr_send == send_bytes + send_bytes_len);
 
@@ -375,26 +382,21 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   }
   free(send_bytes);
 
-  printf("### Round 2. Party %lu publishes (sid, i, srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", party->id, 
-    send_bytes_len, time_diff);
-  
   // Print 
 
-  if (!PRINT_VALUES) return;
-  printf("X_%lu = ", party->index); printECPOINT("", kgp->public_X, party->ec, "\n", 1);
-  printf("A_%lu = ", party->index); printECPOINT("", kgp->psi_sch->proof.A, party->ec, "\n", 1);
-  printf("srid_%lu = ", party->index); printHexBytes("0x", kgp->srid, sizeof(hash_chunk), "\n", 0);
-  printf("u_%lu = ", party->index); printHexBytes("0x", kgp->u, sizeof(hash_chunk), "\n", 0);
-  printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgp->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+  printf("### Publish (srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+  printf("X_%lu = ", party->index); printECPOINT("", kgd->public_X, party->ec, "\n", 1);
+  printf("A_%lu = ", party->index); printECPOINT("", kgd->commited_A, party->ec, "\n", 1);
+  printf("srid_%lu = ", party->index); printHexBytes("0x", kgd->srid, sizeof(hash_chunk), "\n", 0);
+  printf("u_%lu = ", party->index); printHexBytes("0x", kgd->u, sizeof(hash_chunk), "\n", 0);
+  printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgd->echo_broadcast, sizeof(hash_chunk), "\n", 0);
 }
 
 void  cmp_key_generation_round_3_exec (cmp_party_t *party)
 {
-  clock_t time_start = clock();
-  uint64_t time_diff;
+  printf("### KeyGen Phase, Round 3, Party %lu.\n", party->index);
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
-  cmp_key_generation_payload_t *kgp = kgd->payload[party->index];
 
   // Receive payload from parties
 
@@ -406,8 +408,8 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
     cmp_comm_receive_bytes(j, party->index, 2, recv_bytes, recv_bytes_len);
-
     curr_recv = recv_bytes;
+
     cmp_void_from_bytes(kgd->payload[j]->u, &curr_recv, sizeof(hash_chunk), 1);
     cmp_void_from_bytes(kgd->payload[j]->srid, &curr_recv, sizeof(hash_chunk), 1);
     cmp_void_from_bytes(kgd->payload[j]->echo_broadcast, &curr_recv, sizeof(hash_chunk), 1);
@@ -415,26 +417,36 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
     group_elem_from_bytes(kgd->payload[j]->commited_A, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
     
     assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("X_%lu = ", j); printECPOINT("", kgd->payload[j]->public_X, party->ec, "\n", 1);
+    printf("A_%lu = ", j); printECPOINT("", kgd->payload[j]->commited_A, party->ec, "\n", 1);
+    printf("srid_%lu = ", j); printHexBytes("0x", kgd->payload[j]->srid, sizeof(hash_chunk), "\n", 0);
+    printf("u_%lu = ", j); printHexBytes("0x", kgd->payload[j]->u, sizeof(hash_chunk), "\n", 0);
+    printf("echo_broadcast_%lu = ", j); printHexBytes("0x", kgd->payload[j]->echo_broadcast, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
 
   // Execute round
 
+  clock_t time_start = clock();
+  uint64_t time_diff;
+
   int *verified_decomm = calloc(party->num_parties, sizeof(int));
   int *verified_echo = calloc(party->num_parties, sizeof(int));
 
   hash_chunk ver_data;
-  memcpy(party->srid, kgp->srid, sizeof(hash_chunk));
+  memcpy(party->srid, kgd->srid, sizeof(hash_chunk));
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
 
     // Verify commited V_i
-    cmp_key_generation_round_1_commit(ver_data, party->sid, party->parties_ids[j], kgd->payload[j], party->ec);
+    cmp_key_generation_round_1_commit(ver_data, party->sid, party->parties_ids[j], party->ec, kgd->payload[j]);
     verified_decomm[j] = memcmp(ver_data, kgd->payload[j]->V, sizeof(hash_chunk)) == 0;
 
     // Verify echo broadcast of round 1 commitment -- ToDo: expand to identification of malicious party
-    verified_echo[j] = memcmp(kgp->echo_broadcast, kgd->payload[j]->echo_broadcast, sizeof(hash_chunk)) == 0;
+    verified_echo[j] = memcmp(kgd->echo_broadcast, kgd->payload[j]->echo_broadcast, sizeof(hash_chunk)) == 0;
 
     // Set srid as xor of all party's srid_i
     for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) party->srid[pos] ^= kgd->payload[j]->srid[pos];
@@ -444,23 +456,25 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
 
   for (uint64_t j = 0; j < party->num_parties; ++j){
     if (j == party->index) continue;
-    if (verified_decomm[j] != 1) printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_echo[j] != 1)   printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_decomm[j] != 1) printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_echo[j] != 1)   printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->index, j);
   }
   free(verified_decomm);
   free(verified_echo);
 
   // Aux Info (ssid, i, srid)
+  zkp_aux_info_t *aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);
   uint64_t aux_pos = 0;
-  zkp_aux_info_update_move(kgd->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
-  zkp_aux_info_update_move(kgd->aux, &aux_pos, &party->id, sizeof(uint64_t));
-  zkp_aux_info_update_move(kgd->aux, &aux_pos, party->srid, sizeof(hash_chunk));
-  assert(kgd->aux->info_len == aux_pos);
+  zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));
+  zkp_aux_info_update_move(aux, &aux_pos, party->srid, sizeof(hash_chunk));
+  assert(aux->info_len == aux_pos);
 
   // Set Schnorr ZKP public claim and secret, then prove
-  kgp->psi_sch->public.X = kgp->public_X;
-  kgp->psi_sch->secret.x = kgd->secret_x;
-  zkp_schnorr_prove(kgp->psi_sch, kgd->aux, kgd->tau);
+  kgd->psi_sch->public.X = kgd->public_X;
+  kgd->psi_sch->secret.x = kgd->secret_x;
+  zkp_schnorr_prove(kgd->psi_sch, aux, kgd->tau);
+  zkp_aux_info_free(aux);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
@@ -473,7 +487,7 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
-  zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_byte_len, kgp->psi_sch, 1);
+  zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_byte_len, kgd->psi_sch, 1);
   
   assert(curr_send == send_bytes + send_bytes_len);
 
@@ -484,18 +498,16 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   }
   free(send_bytes);
   
-  printf("### Round 3. Party %lu publishes (sid, i, psi_i).\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + psi_sch_byte_len, time_diff);
-
   // Print
 
-  if (!PRINT_VALUES) return;
+  printf("### Publish (psi_sch).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+  printf("psi_i = ...\n");
   printHexBytes("combined srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
 }
 
 void cmp_key_generation_final_exec(cmp_party_t *party)
 {
-  clock_t time_start = clock();
-  uint64_t time_diff;
+  printf("### KeyGen Finalization Round, Party %lu.\n", party->index);
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
 
@@ -511,7 +523,6 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   {
     if (j == party->index) continue;
     cmp_comm_receive_bytes(j, party->index, 3, recv_bytes, recv_bytes_len);
-
     curr_recv = recv_bytes;
     
     kgd->payload[j]->psi_sch->public.G = party->ec;
@@ -520,15 +531,29 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
     zkp_schnorr_proof_from_bytes(kgd->payload[j]->psi_sch, &curr_recv, &psi_sch_byte_len, 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("psi_j = ...\n");
   }
   free(recv_bytes);
 
   // Execute round
 
+  clock_t time_start = clock();
+  uint64_t time_diff;
+
   int *verified_A   = calloc(party->num_parties, sizeof(int));
   int *verified_psi = calloc(party->num_parties, sizeof(int));
 
   // Verify all Schnorr ZKP received from parties  
+
+  // Aux Info (ssid, i, srid)
+  zkp_aux_info_t *aux = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);
+  uint64_t aux_pos = 0;
+  zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));      // Changed for each party later
+  zkp_aux_info_update_move(aux, &aux_pos, party->srid, sizeof(hash_chunk));
+  assert(aux->info_len == aux_pos);
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -536,16 +561,17 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
     
     verified_A[j] = group_elem_equal(kgd->payload[j]->psi_sch->proof.A, kgd->payload[j]->commited_A, party->ec);
 
-    zkp_aux_info_update(kgd->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));              // Update i to commiting player
-    verified_psi[j] = zkp_schnorr_verify(kgd->payload[j]->psi_sch, kgd->aux);
+    zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));              // Update i to commiting player
+    verified_psi[j] = zkp_schnorr_verify(kgd->payload[j]->psi_sch, aux);
   }
+  zkp_aux_info_free(aux);
 
   // Verification log
 
   for (uint64_t j = 0; j < party->num_parties; ++j){
     if (j == party->index) continue;
-    if (verified_A[j] != 1) printf("%sParty %lu: schnorr zkp commited A (psi_sch.proof.A) different from previous round from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_psi[j] != 1) printf("%sParty %lu: schnorr zkp (psi_sch) failed verification from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_A[j] != 1) printf("%sParty %lu: schnorr zkp commited A (psi_sch.proof.A) different from previous round from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_psi[j] != 1) printf("%sParty %lu: schnorr zkp (psi_sch) failed verification from Party %lu\n",ERR_STR, party->index, j);
   }
   free(verified_A);
   free(verified_psi);
@@ -555,19 +581,17 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   //scalar_make_plus_minus(party->secret_x, party->ec_order);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    if (!party->public_X[j]) party->public_X[j] = group_elem_new(party->ec);
     group_elem_copy(party->public_X[j], kgd->payload[j]->public_X);
   }
   cmp_set_sid_hash(party);
   
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   kgd->run_time += time_diff;
-  
-  printf("### Final. Party %lu stores (srid, all X, secret x_i).\t>>>\t%lu B, %lu ms\n", party->id, 
-    sizeof(hash_chunk) + party->num_parties * GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES, time_diff);
 
-  if (!PRINT_VALUES) return;
-  printf("x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+  // Print
+
+  printf("### Final. Party %lu stores (srid, all X, secret x_i).\t>>>\t%lu B, %lu ms\n", party->id, 
+    sizeof(hash_chunk) + GROUP_ORDER_BYTES + party->num_parties * GROUP_ELEMENT_BYTES, time_diff);
 }
 
 /******************************************** 
@@ -578,30 +602,59 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
 
 void cmp_refresh_aux_info_init(cmp_party_t *party)
 {
-  cmp_refresh_aux_info_t *reda = malloc(sizeof(*reda));
+  cmp_refresh_data_t *reda = malloc(sizeof(cmp_refresh_data_t));
   party->refresh_data = reda;
 
-  reda->paillier_priv = NULL;
-  reda->rped_priv = NULL;
+  // Initialize payloads from other parties (and sent by self at my index)
 
-  reda->psi_mod  = zkp_paillier_blum_new();
-  reda->psi_rped = zkp_ring_pedersen_param_new();
-  reda->psi_sch  = calloc(party->num_parties, sizeof(zkp_schnorr_t)); 
-  reda->tau      = calloc(party->num_parties, sizeof(scalar_t));
-  reda->aux      = zkp_aux_info_new(2*sizeof(hash_chunk) + sizeof(uint64_t), NULL);   // prepare for (sid, i, rho)
-  
-  reda->reshare_secret_x_j = calloc(party->num_parties, sizeof(scalar_t));
-  reda->encrypted_reshare_j = calloc(party->num_parties, sizeof(scalar_t));
-  reda->reshare_public_X_j = calloc(party->num_parties, sizeof(gr_elem_t));
-
+  reda->payload = calloc(party->num_parties, sizeof(cmp_refresh_payload_t*));
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    reda->tau[j]                 = scalar_new();
-    reda->reshare_secret_x_j[j]  = scalar_new();
-    reda->encrypted_reshare_j[j] = scalar_new();
-    reda->reshare_public_X_j[j]  = group_elem_new(party->ec);
-    reda->psi_sch[j]             = zkp_schnorr_new();
+    reda->payload[j]                      = malloc(sizeof(cmp_refresh_payload_t));
+    reda->payload[j]->paillier_pub        = paillier_encryption_public_new();
+    reda->payload[j]->rped_pub            = ring_pedersen_public_new();
+    reda->payload[j]->psi_mod             = zkp_paillier_blum_new();
+    reda->payload[j]->psi_rped            = zkp_ring_pedersen_param_new();
+    reda->payload[j]->psi_sch_k           = calloc(party->num_parties, sizeof(zkp_schnorr_t*)); 
+    reda->payload[j]->commited_A_k        = calloc(party->num_parties, sizeof(gr_elem_t));
+    reda->payload[j]->encrypted_reshare_k = calloc(party->num_parties, sizeof(scalar_t));
+    reda->payload[j]->reshare_public_X_k  = calloc(party->num_parties, sizeof(gr_elem_t));
+
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      reda->payload[j]->encrypted_reshare_k[k] = scalar_new();
+      reda->payload[j]->reshare_public_X_k[k]  = group_elem_new(party->ec);
+      reda->payload[j]->commited_A_k[k]        = group_elem_new(party->ec);
+      reda->payload[j]->psi_sch_k[k]           = zkp_schnorr_new();
+    }
   }
+
+  // Init self vprivate values
+
+  reda->paillier_priv      = paillier_encryption_private_new();
+  reda->rped_priv          = ring_pedersen_private_new();
+  reda->reshare_secret_x_j = calloc(party->num_parties, sizeof(scalar_t));
+  reda->tau_j              = calloc(party->num_parties, sizeof(scalar_t));
+  
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    reda->reshare_secret_x_j[j]  = scalar_new();
+    reda->tau_j[j]               = scalar_new();
+  }
+  
+  // Pointer to data stored at payload, but generated by self
+  reda->encrypted_reshare_j = reda->payload[party->index]->encrypted_reshare_k;
+  reda->reshare_public_X_j  = reda->payload[party->index]->reshare_public_X_k;
+  reda->commited_A_j        = reda->payload[party->index]->commited_A_k;
+  reda->paillier_pub        = reda->payload[party->index]->paillier_pub;
+  reda->rped_pub            = reda->payload[party->index]->rped_pub;
+  reda->psi_sch_j           = reda->payload[party->index]->psi_sch_k;
+  reda->psi_mod             = reda->payload[party->index]->psi_mod;
+  reda->psi_rped            = reda->payload[party->index]->psi_rped;
+  reda->rho                 = reda->payload[party->index]->rho;
+  reda->u                   = reda->payload[party->index]->u;
+  reda->V                   = reda->payload[party->index]->V;
+  reda->echo_broadcast      = reda->payload[party->index]->echo_broadcast;
 
   reda->prime_time = 0;
   reda->run_time = 0;
@@ -609,35 +662,46 @@ void cmp_refresh_aux_info_init(cmp_party_t *party)
 
 void cmp_refresh_aux_info_clean(cmp_party_t *party)
 {
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
+  cmp_refresh_data_t *reda = party->refresh_data;
 
-  zkp_aux_info_free(reda->aux);
   paillier_encryption_free_keys(reda->paillier_priv, NULL);
   ring_pedersen_free_param(reda->rped_priv, NULL);
-  zkp_paillier_blum_free(reda->psi_mod);
-  zkp_ring_pedersen_param_free(reda->psi_rped);
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    scalar_free(reda->tau[j]);
+    scalar_free(reda->tau_j[j]);
     scalar_free(reda->reshare_secret_x_j[j]);
-    scalar_free(reda->encrypted_reshare_j[j]);
-    group_elem_free(reda->reshare_public_X_j[j]);
-    zkp_schnorr_free(reda->psi_sch[j]);
   }
-
   free(reda->reshare_secret_x_j);
-  free(reda->encrypted_reshare_j);
-  free(reda->reshare_public_X_j);
-  free(reda->psi_sch);
-  free(reda->tau);
+  free(reda->tau_j);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      scalar_free(reda->payload[j]->encrypted_reshare_k[k]);
+      group_elem_free(reda->payload[j]->reshare_public_X_k[k]);
+      group_elem_free(reda->payload[j]->commited_A_k[k]);
+      zkp_schnorr_free(reda->payload[j]->psi_sch_k[k]);
+    }
+
+    paillier_encryption_free_keys(NULL, reda->payload[j]->paillier_pub);
+    ring_pedersen_free_param(NULL, reda->payload[j]->rped_pub);
+    zkp_paillier_blum_free(reda->payload[j]->psi_mod);
+    zkp_ring_pedersen_param_free(reda->payload[j]->psi_rped);
+
+    free(reda->payload[j]->psi_sch_k);
+    free(reda->payload[j]->commited_A_k);
+    free(reda->payload[j]->encrypted_reshare_k);
+    free(reda->payload[j]->reshare_public_X_k);
+    free(reda->payload[j]);
+  }
+  free(reda->payload);
   free(reda);
 }
 
-void cmp_refresh_aux_info_round_1_commit(hash_chunk V, const hash_chunk sid_hash, uint64_t party_id, const cmp_party_t *party)
+void cmp_refresh_round_1_commit(hash_chunk commit_digest, const hash_chunk sid_hash, uint64_t party_id, uint64_t num_parties, const ec_group_t ec, const cmp_refresh_payload_t *re_payload)
 {
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
-
   uint8_t *temp_bytes = malloc(PAILLIER_MODULUS_BYTES);     // Enough also for GROUP_ELEMENT_BYTES
 
   SHA512_CTX sha_ctx;
@@ -645,61 +709,60 @@ void cmp_refresh_aux_info_round_1_commit(hash_chunk V, const hash_chunk sid_hash
   SHA512_Update(&sha_ctx, sid_hash, sizeof(hash_chunk));
   SHA512_Update(&sha_ctx, &party_id, sizeof(uint64_t));
 
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  for (uint64_t k = 0; k < num_parties; ++k)
   {
-    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, reda->reshare_public_X_j[j], party->ec, 0);
+    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, re_payload->reshare_public_X_k[k], ec, 0);
+    SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
+    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, re_payload->commited_A_k[k], ec, 0);
     SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
   }
 
-  for (uint64_t j = 0; j < party->num_parties; ++j)
-  {
-    group_elem_to_bytes(&temp_bytes, GROUP_ELEMENT_BYTES, reda->psi_sch[j]->proof.A, party->ec, 0);
-    SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-  }
-
-  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->paillier_priv->pub.N, 0);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, re_payload->paillier_pub->N, 0);
+  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, re_payload->rped_pub->N, 0);
+  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, re_payload->rped_pub->s, 0);
+  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
+  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, re_payload->rped_pub->t, 0);
   SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
 
-  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.N, 0);
-  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-
-  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.s, 0);
-  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-
-  scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, reda->rped_priv->pub.t, 0);
-  SHA512_Update(&sha_ctx, temp_bytes, GROUP_ELEMENT_BYTES);
-  SHA512_Update(&sha_ctx, reda->rho, sizeof(hash_chunk));
-  SHA512_Update(&sha_ctx, reda->u, sizeof(hash_chunk));
-  SHA512_Final(V, &sha_ctx);
+  SHA512_Update(&sha_ctx, re_payload->rho, sizeof(hash_chunk));
+  SHA512_Update(&sha_ctx, re_payload->u, sizeof(hash_chunk));
+  SHA512_Final(commit_digest, &sha_ctx);
   
   free(temp_bytes);
 }
 
 void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
 {
+  printf("### Refresh Phase, Round 1, Party %lu.\n", party->index);
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
+  cmp_refresh_data_t *reda = party->refresh_data;
 
-  reda->paillier_priv = paillier_encryption_generate_key(4*PAILLIER_MODULUS_BYTES);
-  reda->rped_priv = ring_pedersen_generate_param(4*RING_PED_MODULUS_BYTES);
+  paillier_encryption_generate_private(reda->paillier_priv, 4*PAILLIER_MODULUS_BYTES);
+  ring_pedersen_generate_private(reda->rped_priv, 4*RING_PED_MODULUS_BYTES);
+  paillier_encryption_copy_keys(NULL, reda->paillier_pub, reda->paillier_priv, NULL);
+  ring_pedersen_copy_param(NULL, reda->rped_pub, reda->rped_priv, NULL);
   
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->prime_time = time_diff;
 
   time_start = clock();
   
-  // Sample other parties' reshares, set negative of sum for current
+  // Sample other parties' reshares, set negative of sum for self
   scalar_set_ul(reda->reshare_secret_x_j[party->index], 0);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    // Also initialize relevant zkp
-    reda->psi_sch[j]->public.G = party->ec;
-    reda->psi_sch[j]->public.g = party->ec_gen;
-    zkp_schnorr_commit(reda->psi_sch[j], reda->tau[j]);
+    // Initialize relevant zkp
+    reda->psi_sch_j[j]->public.G = party->ec;
+    reda->psi_sch_j[j]->public.g = party->ec_gen;
+    zkp_schnorr_commit(reda->psi_sch_j[j], reda->tau_j[j]);
+    group_elem_copy(reda->commited_A_j[j], reda->psi_sch_j[j]->proof.A);
 
-    // Dont choose your own values, only later if needed
+    // Dont choose your own values
     if (j == party->index) continue; 
 
     scalar_sample_in_range(reda->reshare_secret_x_j[j], party->ec_order, 0);
@@ -707,19 +770,40 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
     scalar_sub(reda->reshare_secret_x_j[party->index], reda->reshare_secret_x_j[party->index], reda->reshare_secret_x_j[j], party->ec_order);
   }
   group_operation(reda->reshare_public_X_j[party->index], NULL, party->ec_gen, reda->reshare_secret_x_j[party->index], party->ec);
-
   cmp_sample_bytes(reda->rho, sizeof(hash_chunk));
   cmp_sample_bytes(reda->u, sizeof(hash_chunk));
-  cmp_refresh_aux_info_round_1_commit(reda->V, party->sid, party->id, party);
+
+  cmp_refresh_round_1_commit(reda->V, party->sid, party->id, party->num_parties, party->ec, reda->payload[party->index]);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
 
-  printf("### Round 1. Party %lu broadcasts (sid, i, V_i).\t>>>\t%lu B, %lu ms (gen N_i) + %lu ms (rest)\n", party->id, 2*sizeof(hash_chunk)+sizeof(uint64_t), reda->prime_time, time_diff);
+  // Send payload 
+  
+  uint64_t send_bytes_len = sizeof(hash_chunk);
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
 
-  if (!PRINT_VALUES) return;
+  cmp_void_to_bytes(&curr_send, reda->V, sizeof(hash_chunk), 1);
+  
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_send_bytes(party->index, j, 1, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  // Print
+
+  printf("### Broadcast (V_i).\t>>>\t%lu B, %lu ms (gen N_i) + %lu ms (rest)\n", send_bytes_len, reda->prime_time, time_diff);
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("V_%lu = ", party->index); printHexBytes("0x", reda->V, sizeof(hash_chunk), "\n", 0);
+
+  if (!PRINT_SECRETS) return;
+  printf("paillier_p_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->p, "\n");
+  printf("paillier_q_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->q, "\n");
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     printf("x_%lue%lu = ", party->index, j); printBIGNUM("", reda->reshare_secret_x_j[j], "\n");
@@ -728,46 +812,161 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
 
 void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
 {
+  printf("### Refresh Phase, Round 1, Party %lu.\n", party->index);
+
+  cmp_refresh_data_t *reda = party->refresh_data;
+
+  // Receive payloads from parties
+
+  uint64_t recv_bytes_len = sizeof(hash_chunk);
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv;
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_receive_bytes(j, party->index, 1, recv_bytes, recv_bytes_len);
+    curr_recv = recv_bytes;
+
+    cmp_void_from_bytes(reda->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
+
+    assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("V_%lu = ", j); printHexBytes("0x", reda->payload[j]->V, sizeof(hash_chunk), "\n", 0);
+  }
+  free(recv_bytes);
+
+  // Execute Round
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
+  // Echo broadcast - Hash of all V_i commitments
 
-  // Echo broadcast - Send hash of all V_i commitments
   SHA512_CTX sha_ctx;
   SHA512_Init(&sha_ctx);
-  for (uint64_t i = 0; i < party->num_parties; ++i) SHA512_Update(&sha_ctx, party->parties[i]->refresh_data->V, sizeof(hash_chunk));
+  for (uint64_t i = 0; i < party->num_parties; ++i) SHA512_Update(&sha_ctx, reda->payload[i]->V, sizeof(hash_chunk));
   SHA512_Final(reda->echo_broadcast, &sha_ctx);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
 
-  printf("### Round 2. Party %lu publishes (sid, i, X_i^{1...n}, A_i^{1...n}, Paillier N_i, s_i, t_i, rho_i, u_i, echo_broadcast).\t>>>\t%lu B, %lu ms\n", 
-    party->id, 2*sizeof(uint64_t) + party->num_parties*2*GROUP_ELEMENT_BYTES + 3*PAILLIER_MODULUS_BYTES + 3*sizeof(hash_chunk), time_diff);
+  // Send payload
+
+  uint64_t paillier_bytelen;
+  uint64_t rped_bytelen;
+  paillier_public_to_bytes(NULL, &paillier_bytelen, NULL, PAILLIER_MODULUS_BYTES, 0);
+  ring_pedersen_public_to_bytes(NULL, &rped_bytelen, NULL, RING_PED_MODULUS_BYTES, 0);
+
+  uint64_t send_bytes_len =  3*sizeof(hash_chunk) + paillier_bytelen + rped_bytelen + 2*party->num_parties*GROUP_ELEMENT_BYTES;
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  cmp_void_to_bytes(&curr_send, reda->u, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, reda->rho, sizeof(hash_chunk), 1);
+  cmp_void_to_bytes(&curr_send, reda->echo_broadcast, sizeof(hash_chunk), 1);
+
+  paillier_public_to_bytes(&curr_send, &paillier_bytelen, reda->paillier_pub, PAILLIER_MODULUS_BYTES, 1);
+  ring_pedersen_public_to_bytes(&curr_send, &rped_bytelen, reda->rped_pub, RING_PED_MODULUS_BYTES, 1);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, reda->reshare_public_X_j[j], party->ec, 1);
+    group_elem_to_bytes(&curr_send, GROUP_ELEMENT_BYTES, reda->commited_A_j[j], party->ec, 1);
+  }
   
-  if (!PRINT_VALUES) return;
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+
+    cmp_comm_send_bytes(party->index, j, 2, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  // Print 
+
+  printf("### Publishe (X_i^{1...n}, A_i^{1...n}, Paillier N_i, Pedersen N_i, s_i, t_i, rho_i, u_i, echo_broadcast).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
   printf("echo_broadcast_%lu = ", party->index); printHexBytes("echo_broadcast = 0x", reda->echo_broadcast, sizeof(hash_chunk), "\n", 0);
   printf("rho_%lu = ", party->index); printHexBytes("0x", reda->rho, sizeof(hash_chunk), "\n", 0);
   printf("u_%lu = ", party->index); printHexBytes("0x", reda->u, sizeof(hash_chunk), "\n", 0);
-  printf("N_%lu = ", party->index); printBIGNUM("", reda->rped_priv->pub.N, "\n");
-  printf("s_%lu = ", party->index); printBIGNUM("", reda->rped_priv->pub.s, "\n");
-  printf("t_%lu = ", party->index); printBIGNUM("", reda->rped_priv->pub.t, "\n");
+  printf("paillier_N_%lu = ", party->index); printBIGNUM("", reda->paillier_pub->N, "\n");
+  printf("rped_N_%lu = ", party->index); printBIGNUM("", reda->rped_pub->N, "\n");
+  printf("s_%lu = ", party->index); printBIGNUM("", reda->rped_pub->s, "\n");
+  printf("t_%lu = ", party->index); printBIGNUM("", reda->rped_pub->t, "\n");
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     printf("X_%lue%lu = ", party->index, j); printECPOINT("", reda->reshare_public_X_j[j], party->ec, "\n", 1);
-    printf("A_%lue%lu = ", party->index, j); printECPOINT("", reda->psi_sch[j]->proof.A, party->ec, "\n", 1);
+    printf("A_%lue%lu = ", party->index, j); printECPOINT("", reda->commited_A_j[j], party->ec, "\n", 1);
   }
 }
 
 void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
 {
+  printf("### Refresh Phase, Round 3, Party %lu.\n", party->index);
+
+  cmp_refresh_data_t *reda = party->refresh_data;
+
+  // Receive payloads from parties
+
+  uint64_t paillier_bytelen;
+  uint64_t rped_bytelen;
+  paillier_public_to_bytes(NULL, &paillier_bytelen, NULL, PAILLIER_MODULUS_BYTES, 0);
+  ring_pedersen_public_to_bytes(NULL, &rped_bytelen, NULL, RING_PED_MODULUS_BYTES, 0);
+
+  uint64_t recv_bytes_len =  3*sizeof(hash_chunk) + paillier_bytelen + rped_bytelen + 2*party->num_parties*GROUP_ELEMENT_BYTES;
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv;
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_receive_bytes(j, party->index, 2, recv_bytes, recv_bytes_len);
+    curr_recv = recv_bytes;
+
+    cmp_void_from_bytes(reda->payload[j]->u, &curr_recv, sizeof(hash_chunk), 1);
+    cmp_void_from_bytes(reda->payload[j]->rho, &curr_recv, sizeof(hash_chunk), 1);
+    cmp_void_from_bytes(reda->payload[j]->echo_broadcast, &curr_recv, sizeof(hash_chunk), 1);
+
+    paillier_public_from_bytes(reda->payload[j]->paillier_pub, &curr_recv, &paillier_bytelen, PAILLIER_MODULUS_BYTES, 1);
+    ring_pedersen_public_from_bytes(reda->payload[j]->rped_pub, &curr_recv, &rped_bytelen, RING_PED_MODULUS_BYTES, 1);
+  
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      group_elem_from_bytes(reda->payload[j]->reshare_public_X_k[k], &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
+      group_elem_from_bytes(reda->payload[j]->commited_A_k[k], &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
+    }
+
+    assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("echo_broadcast_%lu = ", j); printHexBytes("echo_broadcast = 0x", reda->payload[j]->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+    printf("rho_%lu = ", j); printHexBytes("0x", reda->payload[j]->rho, sizeof(hash_chunk), "\n", 0);
+    printf("u_%lu = ", j); printHexBytes("0x", reda->payload[j]->u, sizeof(hash_chunk), "\n", 0);
+    printf("paillier_N_%lu = ", j); printBIGNUM("", reda->payload[j]->paillier_pub->N, "\n");
+    printf("rped_N_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->N, "\n");
+    printf("s_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->s, "\n");
+    printf("t_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->t, "\n");
+
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      printf("X_%lue%lu = ", j, k); printECPOINT("", reda->payload[j]->reshare_public_X_k[k], party->ec, "\n", 1);
+      printf("A_%lue%lu = ", j, k); printECPOINT("", reda->payload[j]->commited_A_k[k], party->ec, "\n", 1);
+    }
+  }
+  free(recv_bytes);
+
+  // Execute round
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
-  
   gr_elem_t combined_public = group_elem_new(party->ec);
+
+  // Verification
 
   int *verified_modulus_size = calloc(party->num_parties, sizeof(int));
   int *verified_public_shares = calloc(party->num_parties, sizeof(int));
@@ -775,36 +974,31 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   int *verified_echo = calloc(party->num_parties, sizeof(int));
 
   hash_chunk ver_data;
-  memcpy(reda->combined_rho, reda->rho, sizeof(hash_chunk));
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue; 
 
     // Verify modulus size
-    verified_modulus_size[j] = scalar_bitlength(party->parties[j]->refresh_data->paillier_priv->pub.N) >= 8*PAILLIER_MODULUS_BYTES-1;
+    verified_modulus_size[j] = scalar_bitlength(reda->payload[j]->paillier_pub->N) >= 8*PAILLIER_MODULUS_BYTES-1;
 
-    // Verify shared public X_j is valid
+    // Verify shared public X_j^k is valid from party j
     group_operation(combined_public, NULL, NULL, NULL, party->ec);
     for (uint64_t k = 0; k < party->num_parties; ++k) {
-      group_operation(combined_public, combined_public, party->parties[j]->refresh_data->reshare_public_X_j[k], NULL, party->ec);
+      group_operation(combined_public, combined_public, reda->payload[j]->reshare_public_X_k[k], NULL, party->ec);
     }
     verified_public_shares[j] = group_elem_is_ident(combined_public, party->ec) == 1;
 
     // Verify commited V_i
-    cmp_refresh_aux_info_round_1_commit(ver_data, party->sid, party->parties_ids[j], party->parties[j]);
-    verified_decomm[j] = memcmp(ver_data, party->parties[j]->refresh_data->V, sizeof(hash_chunk)) == 0;
+    cmp_refresh_round_1_commit(ver_data, party->sid, party->parties_ids[j], party->num_parties, party->ec, reda->payload[j]);
+    verified_decomm[j] = memcmp(ver_data, reda->payload[j]->V, sizeof(hash_chunk)) == 0;
 
     // Verify echo broadcast of round 1 commitment -- ToDo: expand to identification of malicious party
-    verified_echo[j] = memcmp(reda->echo_broadcast, party->parties[j]->refresh_data->echo_broadcast, sizeof(hash_chunk)) == 0;
+    verified_echo[j] = memcmp(reda->echo_broadcast, reda->payload[j]->echo_broadcast, sizeof(hash_chunk)) == 0;
 
-    // Set combined rho as xor of all party's rho_i
-    for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) reda->combined_rho[pos] ^= party->parties[j]->refresh_data->rho[pos];
-
-
-    if (verified_modulus_size[j] != 1) printf("%sParty %lu: N_i bitlength from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_public_shares[j] != 1) printf("%sParty %lu: invalid X_j_k sharing from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_decomm[j] != 1)        printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_echo[j] != 1)          printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_modulus_size[j] != 1)  printf("%sParty %lu: N_i bitlength from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_public_shares[j] != 1) printf("%sParty %lu: invalid X_j_k sharing from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_decomm[j] != 1)        printf("%sParty %lu: decommitment of V_i from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_echo[j] != 1)          printf("%sParty %lu: received different echo broadcast of round 1 from Party %lu\n",ERR_STR, party->index, j);
   }
 
   free(verified_modulus_size);
@@ -813,89 +1007,193 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   free(verified_echo);
   group_elem_free(combined_public);
 
-    // Aux Info for ZKP (ssid, i, combined rho)
+  // Computation
+
+  // Set combined rho as xor of all party's rho_i
+  memset(reda->combined_rho, 0x00, sizeof(hash_chunk));
+  for (uint64_t i = 0; i < party->num_parties; ++i)
+  {
+    for (uint64_t pos = 0; pos < sizeof(hash_chunk); ++pos) reda->combined_rho[pos] ^= reda->payload[i]->rho[pos];
+  }
+
+  // AuxInfo for ZKP (ssid, i, combined rho)
+  zkp_aux_info_t *aux = zkp_aux_info_new(sizeof(uint64_t) + 2*sizeof(hash_chunk), NULL);
   uint64_t aux_pos = 0;
-  zkp_aux_info_update_move(reda->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
-  zkp_aux_info_update_move(reda->aux, &aux_pos, &party->id, sizeof(uint64_t));
-  zkp_aux_info_update_move(reda->aux, &aux_pos, reda->combined_rho, sizeof(hash_chunk));
-  assert(reda->aux->info_len == aux_pos);
+  zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));
+  zkp_aux_info_update_move(aux, &aux_pos, reda->combined_rho, sizeof(hash_chunk));
+  assert(aux->info_len == aux_pos);
 
   // Generate ZKP, set public claim and secret, then prove
-  reda->psi_mod->public = &reda->paillier_priv->pub;
+  reda->psi_mod->public  = reda->paillier_pub;
   reda->psi_mod->private = reda->paillier_priv;
-  zkp_paillier_blum_prove(reda->psi_mod, reda->aux);
+  zkp_paillier_blum_prove(reda->psi_mod, aux);
 
-  reda->psi_rped->rped_pub = &reda->rped_priv->pub;
-  reda->psi_rped->secret = reda->rped_priv;
-  zkp_ring_pedersen_param_prove(reda->psi_rped, reda->aux);
+  reda->psi_rped->rped_pub = reda->rped_pub;
+  reda->psi_rped->secret   = reda->rped_priv;
+  zkp_ring_pedersen_param_prove(reda->psi_rped, aux);
 
+  // Encrypt refresh shares and Schnorr prove
   scalar_t temp_paillier_rand = scalar_new();
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    // Encrypt all secret reshares (including own) - ToDo add echo broadcast on these
-    paillier_encryption_sample(temp_paillier_rand, &party->parties[j]->refresh_data->paillier_priv->pub);
-    paillier_encryption_encrypt(reda->encrypted_reshare_j[j], reda->reshare_secret_x_j[j], temp_paillier_rand, &party->parties[j]->refresh_data->paillier_priv->pub);
+    // Encrypt all secret reshares (including own) - TODO add echo broadcast on these
+    paillier_encryption_sample(temp_paillier_rand, reda->payload[j]->paillier_pub);
+    paillier_encryption_encrypt(reda->encrypted_reshare_j[j], reda->reshare_secret_x_j[j], temp_paillier_rand, reda->payload[j]->paillier_pub);
 
-    reda->psi_sch[j]->public.X = reda->reshare_public_X_j[j];
-    reda->psi_sch[j]->secret.x = reda->reshare_secret_x_j[j];
-    zkp_schnorr_prove(reda->psi_sch[j], reda->aux, reda->tau[j]);
+    reda->psi_sch_j[j]->public.X = reda->reshare_public_X_j[j];
+    reda->psi_sch_j[j]->secret.x = reda->reshare_secret_x_j[j];
+    zkp_schnorr_prove(reda->psi_sch_j[j], aux, reda->tau_j[j]);
   }
   scalar_free(temp_paillier_rand);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
   
-  uint64_t psi_sch_byte_len;
-  uint64_t psi_rped_bytes;
-  uint64_t psi_mod_bytes;
-  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_byte_len, NULL, 0);
-  zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytes, NULL, 0);
-  zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytes, NULL, 0);
+  // Send payload
 
+  uint64_t psi_rped_bytelen;
+  uint64_t psi_mod_bytelen;
+  uint64_t psi_sch_bytelen;
+  zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytelen, NULL, 0);
+  zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytelen, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, 0);
 
-  printf("### Round 3. Party %lu publishes (sid, i, psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", party->id, 
-    2*sizeof(uint64_t) + psi_mod_bytes + psi_rped_bytes + (party->num_parties-1)*psi_sch_byte_len + party->num_parties*2*PAILLIER_MODULUS_BYTES, time_diff);
+  uint64_t send_bytes_len =  psi_mod_bytelen + psi_rped_bytelen + party->num_parties * (psi_sch_bytelen + 2*PAILLIER_MODULUS_BYTES);
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
 
-  if (!PRINT_VALUES) return;
+  zkp_paillier_blum_proof_to_bytes(&curr_send, &psi_mod_bytelen, reda->psi_mod, 1);
+  zkp_ring_pedersen_param_proof_to_bytes(&curr_send, &psi_rped_bytelen, reda->psi_rped, 1);
+  
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_bytelen, reda->psi_sch_j[j], 1);
+    scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, reda->encrypted_reshare_j[j], 1);
+  }
+  
+  assert(curr_send == send_bytes + send_bytes_len);
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+
+    cmp_comm_send_bytes(party->index, j, 3, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  // Print
+
+  printf("### Publishe (psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
   printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);
+  printf("psi_mod_i = ...\n");
+  printf("psi_rped_i = ...\n");
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    printf("psi_sch_i_%lu = ...\n", j);
+    printf("Enc_%lu(x_%lue%lu) = ", j, party->index, j); printBIGNUM("", reda->encrypted_reshare_j[j], "\n");
+  }
 }
 
 void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
 {
+  printf("### Refresh Phase, Finalization Round, Party %lu.\n", party->index);
+
+  cmp_refresh_data_t *reda = party->refresh_data;
+
+  // Receive payloads from parties
+
+  uint64_t psi_rped_bytelen;
+  uint64_t psi_mod_bytelen;
+  uint64_t psi_sch_bytelen;
+  zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytelen, NULL, 0);
+  zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytelen, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, 0);
+
+  uint64_t recv_bytes_len = psi_mod_bytelen + psi_rped_bytelen + party->num_parties * (psi_sch_bytelen + 2*PAILLIER_MODULUS_BYTES);
+  uint8_t *recv_bytes = malloc(recv_bytes_len);
+  uint8_t *curr_recv;
+
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+    cmp_comm_receive_bytes(j, party->index, 3, recv_bytes, recv_bytes_len);
+    curr_recv = recv_bytes;
+    
+    reda->payload[j]->psi_mod->public = reda->payload[j]->paillier_pub;
+    zkp_paillier_blum_proof_from_bytes(reda->payload[j]->psi_mod, &curr_recv, &psi_mod_bytelen, 1);
+
+    reda->payload[j]->psi_rped->rped_pub = reda->payload[j]->rped_pub;
+    zkp_ring_pedersen_param_proof_from_bytes(reda->payload[j]->psi_rped, &curr_recv, &psi_rped_bytelen, 1);
+    
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      reda->payload[j]->psi_sch_k[k]->public.G = party->ec;
+      reda->payload[j]->psi_sch_k[k]->public.g = party->ec_gen;
+      reda->payload[j]->psi_sch_k[k]->public.X = reda->payload[j]->reshare_public_X_k[k];
+      zkp_schnorr_proof_from_bytes(reda->payload[j]->psi_sch_k[k], &curr_recv, &psi_sch_bytelen, 1);
+      scalar_from_bytes(reda->payload[j]->encrypted_reshare_k[k], &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
+    }
+
+    assert(curr_recv == recv_bytes + recv_bytes_len);
+
+    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
+    printf("psi_mod_%lu = ...\n", j);
+    printf("psi_rped_%lu = ...\n", j);
+    for (uint64_t k = 0; k < party->num_parties; ++k)
+    {
+      printf("psi_sch_%lu = ...\n", k);
+      printf("Enc_%lu(x_%lue%lu) = ", k, j, k); printBIGNUM("", reda->payload[j]->encrypted_reshare_k[k], "\n");
+    }
+  }
+  free(recv_bytes);
+
+  // Execute round
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_refresh_aux_info_t *reda = party->refresh_data;
-
-  int *verified_reshare  = calloc(party->num_parties, sizeof(int));
-  int *verified_psi_mod  = calloc(party->num_parties, sizeof(int));
-  int *verified_psi_rped = calloc(party->num_parties, sizeof(int));
-  int *verified_psi_sch  = calloc(party->num_parties*party->num_parties, sizeof(int));
-
   // Verify all Schnorr ZKP and values received from parties  
+
+  int *verified_reshare   = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_mod   = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_rped  = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_sch_k = calloc(party->num_parties*party->num_parties, sizeof(int));
+  int *verified_A_k       = calloc(party->num_parties*party->num_parties, sizeof(int));
+
+  // Aux Info for ZKP (ssid, i, combined rho)
+  zkp_aux_info_t *aux = zkp_aux_info_new(sizeof(uint64_t) + 2*sizeof(hash_chunk), NULL);
+  uint64_t aux_pos = 0;
+  zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));                // Will be changed for each verified party
+  zkp_aux_info_update_move(aux, &aux_pos, reda->combined_rho, sizeof(hash_chunk));
+  assert(aux->info_len == aux_pos);
 
   scalar_t received_reshare = scalar_new();
   scalar_t sum_received_reshares = scalar_new();
   gr_elem_t ver_public = group_elem_new(party->ec);
   
+  // Sum all secret reshares, self and generated by others for self
+  scalar_copy(sum_received_reshares, reda->reshare_secret_x_j[party->index]);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   { 
-    // Decrypt and verify reshare secret vs public   
-    paillier_encryption_decrypt(received_reshare, party->parties[j]->refresh_data->encrypted_reshare_j[party->index], reda->paillier_priv);     // TODO: reduce MODULU q!!!
-    scalar_add(sum_received_reshares, sum_received_reshares, received_reshare, party->ec_order);
-    group_operation(ver_public, NULL, party->ec_gen, received_reshare, party->ec);
-    verified_reshare[j] = group_elem_equal(ver_public, party->parties[j]->refresh_data->reshare_public_X_j[party->index], party->ec) == 1;
-
     if (j == party->index) continue; 
 
-    zkp_aux_info_update(reda->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));                  // Update i to commiting player
-    verified_psi_mod[j] = zkp_paillier_blum_verify(party->parties[j]->refresh_data->psi_mod, reda->aux) == 1;
-    verified_psi_rped[j] = zkp_ring_pedersen_param_verify(party->parties[j]->refresh_data->psi_rped, reda->aux) == 1;
+    // Decrypt and verify reshare secret vs public   
+    paillier_encryption_decrypt(received_reshare, reda->payload[j]->encrypted_reshare_k[party->index], reda->paillier_priv);
+    scalar_add(sum_received_reshares, sum_received_reshares, received_reshare, party->ec_order);
+    group_operation(ver_public, NULL, party->ec_gen, received_reshare, party->ec);
+    verified_reshare[j] = group_elem_equal(ver_public, reda->payload[j]->reshare_public_X_k[party->index], party->ec) == 1;
+
+    // Verify ZKP
+    zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));                  // Update i to commiting player
+    verified_psi_mod[j] = zkp_paillier_blum_verify(reda->payload[j]->psi_mod, aux) == 1;
+    verified_psi_rped[j] = zkp_ring_pedersen_param_verify(reda->payload[j]->psi_rped, aux) == 1;
 
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
-      verified_psi_sch[k + party->num_parties*j] = (zkp_schnorr_verify(party->parties[j]->refresh_data->psi_sch[k], reda->aux) == 1)
-       && (group_elem_equal(party->parties[j]->refresh_data->psi_sch[k]->proof.A, party->parties[j]->refresh_data->psi_sch[k]->proof.A, party->ec) == 1);      // Check A's of rounds 2 and 3
+      verified_A_k[k + party->num_parties*j] = group_elem_equal(reda->payload[j]->psi_sch_k[k]->proof.A, reda->payload[j]->commited_A_k[k], party->ec) == 1;
+      verified_psi_sch_k[k + party->num_parties*j] = (zkp_schnorr_verify(reda->payload[j]->psi_sch_k[k], aux) == 1);
     }
   }
   scalar_free(received_reshare);
@@ -904,59 +1202,68 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   {
     if (j == party->index) continue; 
 
-    if (verified_reshare[j] != 1)  printf("%sParty %lu: Public reshare inconsistent from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_psi_mod[j] != 1)  printf("%sParty %lu: Paillier-Blum ZKP failed verification from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
-    if (verified_psi_rped[j] != 1) printf("%sParty %lu: Ring-Pedersen ZKP failed verification from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
+    if (verified_reshare[j] != 1)  printf("%sParty %lu: Public reshare inconsistent from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_psi_mod[j] != 1)  printf("%sParty %lu: Paillier-Blum ZKP failed verification from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_psi_rped[j] != 1) printf("%sParty %lu: Ring-Pedersen ZKP failed verification from Party %lu\n",ERR_STR, party->index, j);
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
-      if (verified_psi_sch[k + party->num_parties*j] != 1) printf("%sParty %lu: Schnorr ZKP failed verification from Party %lu for Party %lu\n",ERR_STR, party->id, party->parties_ids[j], party->parties_ids[k]);
+      if (verified_psi_sch_k[k + party->num_parties*j] != 1) printf("%sParty %lu: Schnorr ZKP failed verification from Party %lu for Party %lu\n",ERR_STR, party->index, j, k);
+
+      if (verified_A_k[k + party->num_parties*j] != 1) printf("%sParty %lu: schnorr zkp commited A (psi_sch.proof.A) different from previous round from Party %lu for Party %lu\n",ERR_STR, party->index, j, k);
     }
   }
 
   free(verified_reshare);
   free(verified_psi_mod);
   free(verified_psi_rped);
-  free(verified_psi_sch);
+  free(verified_psi_sch_k);
+  free(verified_A_k);
   group_elem_free(ver_public);
 
-  // Refresh Party's values
-  if (party->paillier_priv) paillier_encryption_free_keys(party->paillier_priv, NULL);
-  party->paillier_priv = paillier_encryption_duplicate_key(reda->paillier_priv);
+  // Refresh Party's keys
+  paillier_encryption_copy_keys(party->paillier_priv, party->paillier_pub[party->index], reda->paillier_priv, NULL);
+  ring_pedersen_copy_param(NULL, party->rped_pub[party->index], reda->rped_priv, NULL);
 
+  // Update sid from current party values
   cmp_set_sid_hash(party);
 
+    // Update key shares
   scalar_add(party->secret_x, party->secret_x, sum_received_reshares, party->ec_order);
   scalar_free(sum_received_reshares);
 
   for (uint64_t i = 0; i < party->num_parties; ++i)
   {
-    for (uint64_t k = 0; k < party->num_parties; ++k) group_operation(party->public_X[i], party->public_X[i], party->parties[k]->refresh_data->reshare_public_X_j[i], NULL, party->ec);
+    for (uint64_t k = 0; k < party->num_parties; ++k) group_operation(party->public_X[k], party->public_X[k], reda->payload[i]->reshare_public_X_k[k], NULL, party->ec);
 
-    party->paillier_pub[i] = paillier_encryption_copy_public(party->parties[i]->refresh_data->paillier_priv);
-    party->rped_pub[i] = ring_pedersen_copy_public(party->parties[i]->refresh_data->rped_priv);
+    if (i == party->index) continue; // Self copied before loop
+    paillier_encryption_copy_keys(NULL, party->paillier_pub[i], NULL, reda->payload[i]->paillier_pub);
+    ring_pedersen_copy_param(NULL, party->rped_pub[i], NULL, reda->payload[i]->rped_pub);
   }
 
-  // UDIBUG: Sanity Check
+  // UDIBUG: Sanity Check of self public key vs private
   gr_elem_t check_my_public = group_elem_new(party->ec);
   group_operation(check_my_public, NULL, party->ec_gen, party->secret_x, party->ec);
-  assert( group_elem_equal(check_my_public, party->public_X[party->index], party->ec) );
+  assert( group_elem_equal(check_my_public, party->public_X[party->index], party->ec) == 1);
   group_elem_free(check_my_public);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
   
-  printf("### Final. Party %lu stores fresh (secret x_i, all public X, N_i, s_i, t_i).\t>>>\t%lu B, %lu ms\n", party->id, 
-    party->num_parties * GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES + party->num_parties*3*PAILLIER_MODULUS_BYTES, time_diff);
+  // Print
 
-  if (!PRINT_VALUES) return;
-  printf("fresh_x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+  printf("### Final. Party %lu stores fresh (secret x_i, all public X, paillier_N_i, rped_N_i, s_i, t_i).\t>>>\t%lu B, %lu ms\n", party->id, GROUP_ORDER_BYTES + party->num_parties*(GROUP_ELEMENT_BYTES + PAILLIER_MODULUS_BYTES + 3*RING_PED_MODULUS_BYTES), time_diff);
+
   for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
     printf("X_%lu = ", i); printECPOINT("", party->public_X[i], party->ec, "\n", 1);
-    printf("N_%lu = ", i); printBIGNUM("", party->rped_pub[i]->N, "\n");
+    printf("paillier_N_%lu = ", i); printBIGNUM("", party->paillier_pub[i]->N, "\n");
+    printf("rped_N_%lu = ", i); printBIGNUM("", party->rped_pub[i]->N, "\n");
     printf("s_%lu = ", i); printBIGNUM("", party->rped_pub[i]->s, "\n");
     printf("t_%lu = ", i); printBIGNUM("", party->rped_pub[i]->t, "\n");
   }
+
+  if (!PRINT_SECRETS) return;
+  printf("fresh_x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
 }
 
 /******************************************** 
@@ -964,6 +1271,7 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
  *   Pre-Signing
  * 
  ********************************************/
+
 
 void cmp_presigning_init(cmp_party_t *party)
 {
@@ -1078,7 +1386,7 @@ void cmp_presigning_clean(cmp_party_t *party)
   free(preda);
 }
 
-
+/*
 void cmp_presigning_round_1_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
@@ -1117,10 +1425,10 @@ void cmp_presigning_round_1_exec (cmp_party_t *party)
 
   uint64_t psi_enc_bytes;
   zkp_encryption_in_range_proof_to_bytes(NULL, &psi_enc_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
-  printf("### Round 1. Party %lu broadcasts (sid, i, K_i, G_i). Send (sid, i, psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id,
+  printf("### Round 1. Party %lu broadcasts (K_i, G_i). Send (psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id,
     2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * psi_enc_bytes, time_diff);
 
-  if (!PRINT_VALUES) return;
+  if (!PRINT_SECRETS) return;
   printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("k_%lu = ", party->index); printBIGNUM("", preda->k, "\n");
   printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
@@ -1264,9 +1572,9 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
   zkp_operation_group_commitment_range_proof_to_bytes(NULL, &psi_affg_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logG_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  printf("### Round 2. Party %lu sends (sid, i, Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + GROUP_ELEMENT_BYTES + (party->num_parties-1) * ( 4*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes), time_diff);
+  printf("### Round 2. Party %lu sends (Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id, 2*sizeof(uint64_t) + GROUP_ELEMENT_BYTES + (party->num_parties-1) * ( 4*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes), time_diff);
   
-  if (!PRINT_VALUES) return;
+  if (!PRINT_SECRETS) return;
   printf("Gamma_%lu = ", party->index); printECPOINT("", preda->Gamma, party->ec, "\n", 1);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1361,10 +1669,10 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   uint64_t psi_logK_bytes;
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logK_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  printf("### Round 3. Party %lu publishes (sid, i, delta_i, Delta_i, psi_logK_j)).\t>>>\t%lu B, %lu ms\n", party->id, 
+  printf("### Round 3. Party %lu publishes (delta_i, Delta_i, psi_logK_j)).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + (party->num_parties -1)*psi_logK_bytes, time_diff);
 
-  if (!PRINT_VALUES) return;
+  if (!PRINT_SECRETS) return;
   printf("delta_%lu = ", party->index); printBIGNUM("", preda->delta, "\n");
   printf("Delta_%lu = ", party->index); printECPOINT("", preda->Delta, party->ec, "\n", 1);
 }
@@ -1420,10 +1728,10 @@ void  cmp_presigning_final_exec (cmp_party_t *party)
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
   
-  printf("### Round 4. Party %lu stores (sid, i, R, k_i, chi_i).\t>>>\t%lu B, %lu ms\n", party->id, 
+  printf("### Round 4. Party %lu stores (R, k_i, chi_i).\t>>>\t%lu B, %lu ms\n", party->id, 
     2*sizeof(uint64_t) + 2*GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES, time_diff);
 
-  if (!PRINT_VALUES) return;
+  if (!PRINT_SECRETS) return;
   printf("R_%lu = ", party->index); printECPOINT("", party->R, party->ec, "\n", 1);  
   printf("k_%lu = ", party->index); printBIGNUM("", party->k, "\n");
   printf("chi_%lu = ", party->index); printBIGNUM("", party->chi, "\n");
@@ -1443,3 +1751,4 @@ void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, 
   scalar_free(first_term);
   scalar_free(second_term);
 }
+*/

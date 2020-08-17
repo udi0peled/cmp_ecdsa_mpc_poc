@@ -1,38 +1,41 @@
 #include "ring_pedersen_parameters.h"
 #include <assert.h>
 
-ring_pedersen_private_t *ring_pedersen_param_from_primes  (const scalar_t p, const scalar_t q)
+ring_pedersen_private_t *ring_pedersen_private_new ()
 {
-  ring_pedersen_private_t *priv = malloc(sizeof(*priv));
+  ring_pedersen_private_t *priv = malloc(sizeof(ring_pedersen_private_t));
 
-  BN_CTX *bn_ctx = BN_CTX_secure_new();
-  
   priv->phi_N = scalar_new();
   priv->lam   = scalar_new();
-  priv->pub.N = scalar_new();
-  priv->pub.s = scalar_new();
-  priv->pub.t = scalar_new();
+  priv->N = scalar_new();
+  priv->s = scalar_new();
+  priv->t = scalar_new();
 
-  BN_mul(priv->pub.N, p, q, bn_ctx);
+  return priv;
+}
 
-  BN_sub(priv->phi_N, priv->pub.N, p);
+void ring_pedersen_private_from_primes  (ring_pedersen_private_t *priv, const scalar_t p, const scalar_t q)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  
+  BN_mul(priv->N, p, q, bn_ctx);
+
+  BN_sub(priv->phi_N, priv->N, p);
   BN_sub(priv->phi_N, priv->phi_N, q);
   BN_add_word(priv->phi_N, 1);
 
   scalar_sample_in_range(priv->lam, priv->phi_N, 0);
 
   scalar_t r = scalar_new();
-  scalar_sample_in_range(r, priv->pub.N, 1);
-  BN_mod_mul(priv->pub.t, r, r, priv->pub.N, bn_ctx);
-  BN_mod_exp(priv->pub.s, priv->pub.t, priv->lam, priv->pub.N, bn_ctx);
+  scalar_sample_in_range(r, priv->N, 1);
+  BN_mod_mul(priv->t, r, r, priv->N, bn_ctx);
+  BN_mod_exp(priv->s, priv->t, priv->lam, priv->N, bn_ctx);
   scalar_free(r);
   
   BN_CTX_free(bn_ctx);
-
-  return priv;
 }
 
-ring_pedersen_private_t *ring_pedersen_generate_param (uint64_t prime_bits) 
+void ring_pedersen_generate_private (ring_pedersen_private_t *priv, uint64_t prime_bits) 
 { 
   scalar_t p = scalar_new();
   scalar_t q = scalar_new();
@@ -40,23 +43,49 @@ ring_pedersen_private_t *ring_pedersen_generate_param (uint64_t prime_bits)
   BN_generate_prime_ex(p, prime_bits, 1, NULL, NULL, NULL);
   BN_generate_prime_ex(q, prime_bits, 1, NULL, NULL, NULL);
 
-  ring_pedersen_private_t *priv = ring_pedersen_param_from_primes(p, q);
+  ring_pedersen_private_from_primes(priv, p, q);
 
   scalar_free(p);
   scalar_free(q);
-
-  return priv;
 }
 
-ring_pedersen_public_t *ring_pedersen_copy_public(const ring_pedersen_private_t *priv)
+ring_pedersen_public_t  *ring_pedersen_public_new()
 {
-  ring_pedersen_public_t *pub = malloc(sizeof(*pub));
-
-  pub->N = BN_dup(priv->pub.N);
-  pub->t = BN_dup(priv->pub.t);
-  pub->s = BN_dup(priv->pub.s);
+  ring_pedersen_public_t *pub = malloc(sizeof(ring_pedersen_public_t));
+  
+  pub->N = scalar_new();
+  pub->s = scalar_new();
+  pub->t = scalar_new();
 
   return pub;
+}
+void ring_pedersen_copy_param (ring_pedersen_private_t *copy_priv, ring_pedersen_public_t *copy_pub, const ring_pedersen_private_t *priv, const ring_pedersen_public_t *pub)
+{
+  if (pub && copy_pub)
+  {
+    BN_copy(copy_pub->N, pub->N);
+    BN_copy(copy_pub->s, pub->s);
+    BN_copy(copy_pub->t, pub->t);
+  }
+
+  if (priv)
+  {
+    if (copy_priv)
+    {
+      BN_copy(copy_priv->N, priv->N);
+      BN_copy(copy_priv->s, priv->s);
+      BN_copy(copy_priv->t, priv->t);
+      BN_copy(copy_priv->lam, priv->lam);
+      BN_copy(copy_priv->phi_N, priv->phi_N);
+    }
+
+    if (!pub && copy_pub)
+    {
+      BN_copy(copy_pub->N, priv->N);
+      BN_copy(copy_pub->s, priv->s);
+      BN_copy(copy_pub->t, priv->t);
+    }
+  }
 }
 
 void  ring_pedersen_free_param(ring_pedersen_private_t *priv, ring_pedersen_public_t *pub)
@@ -65,9 +94,9 @@ void  ring_pedersen_free_param(ring_pedersen_private_t *priv, ring_pedersen_publ
   {
     scalar_free(priv->lam);
     scalar_free(priv->phi_N);
-    scalar_free(priv->pub.N);
-    scalar_free(priv->pub.s);
-    scalar_free(priv->pub.t);
+    scalar_free(priv->N);
+    scalar_free(priv->s);
+    scalar_free(priv->t);
 
     free(priv);
   }

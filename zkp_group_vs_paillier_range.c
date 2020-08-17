@@ -193,6 +193,8 @@ void zkp_group_vs_paillier_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_
 
 void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, int move_to_end)
 { 
+  if (!zkp->proof.Y) zkp->proof.Y = group_elem_new(zkp->public.G);
+  
   uint64_t needed_byte_len = GROUP_ELEMENT_BYTES + 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*x_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
 
   if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))

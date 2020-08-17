@@ -32,7 +32,8 @@ paillier_private_key_t *time_paillier_generate_keys(uint64_t paillier_modulus_bi
 {
   start = clock();
   
-  paillier_private_key_t *priv = paillier_encryption_generate_key(paillier_modulus_bits/2);
+  paillier_private_key_t *priv = paillier_encryption_private_new();
+  paillier_encryption_generate_private(priv, paillier_modulus_bits/2);
 
   diff = clock() - start;
 
@@ -41,10 +42,10 @@ paillier_private_key_t *time_paillier_generate_keys(uint64_t paillier_modulus_bi
   printBIGNUM("p = ", (priv->p), "\n");
   printBIGNUM("q = ", (priv->q), "\n");
   printBIGNUM("nmu = ", (priv->mu), "\n");
-  printBIGNUM("N = ", (priv->pub.N), "\n");
-  printBIGNUM("N2 = ", (priv->pub.N2), "\n");
+  printBIGNUM("N = ", (priv->N), "\n");
+  printBIGNUM("N2 = ", (priv->N2), "\n");
 
-  printf("### generating single paillier (%d-bits modulus) priv/pub key pair: %lu msec\n", BN_num_bits(priv->pub.N), diff * 1000/ CLOCKS_PER_SEC);
+  printf("### generating single paillier (%d-bits modulus) priv/pub key pair: %lu msec\n", BN_num_bits(priv->N), diff * 1000/ CLOCKS_PER_SEC);
 
   return priv;
 }
@@ -53,18 +54,19 @@ ring_pedersen_private_t *time_ring_pedersen_generate_param(uint64_t rped_modulus
 {
   start = clock();
   
-  ring_pedersen_private_t *priv = ring_pedersen_generate_param(rped_modulus_bits/2);
+  ring_pedersen_private_t *priv = ring_pedersen_private_new();
+  ring_pedersen_generate_private(priv, rped_modulus_bits/2);
 
   diff = clock() - start;
 
   printf("# ring Pedersen parameters\n");
-  printBIGNUM("N = ", priv->pub.N, "\n");
+  printBIGNUM("N = ", priv->N, "\n");
   printBIGNUM("phi_N = ",priv->phi_N, "\n");
   printBIGNUM("lambda ", priv->lam, "\n");
-  printBIGNUM("s = ", priv->pub.s, "\n");
-  printBIGNUM("t = ", priv->pub.t, "\n");
+  printBIGNUM("s = ", priv->s, "\n");
+  printBIGNUM("t = ", priv->t, "\n");
 
-  printf("### generating single ring pedersen parameters (%d-bits modulus): %lu msec\n", BN_num_bits(priv->pub.N), diff * 1000/ CLOCKS_PER_SEC);
+  printf("### generating single ring pedersen parameters (%d-bits modulus): %lu msec\n", BN_num_bits(priv->N), diff * 1000/ CLOCKS_PER_SEC);
 
   return priv;
 }
@@ -179,7 +181,7 @@ void time_bn_ctx(uint64_t reps)
 
 int main(int argc, char* argv[])
 { 
-  int print_values = 0;
+  int print_secrets = 0;
   uint64_t num_parties = 2;
   uint64_t party_index;
 
@@ -199,7 +201,7 @@ int main(int argc, char* argv[])
       if (argc >= 4)
       {
         num_parties = strtoul(argv[3], NULL, 10);
-        if (argc >= 5) print_values = strcmp(argv[4], "0") != 0;
+        if (argc >= 5) print_secrets = strcmp(argv[4], "0") != 0;
       }
 
       printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
@@ -217,7 +219,7 @@ int main(int argc, char* argv[])
 
       printf("\n### Party %lu executing protocol, out of %lu parties\n", party_index, num_parties);
       
-      test_protocol(party_index, num_parties, print_values);
+      test_protocol(party_index, num_parties, print_secrets);
 
       return 0;
     }
@@ -271,7 +273,7 @@ int main(int argc, char* argv[])
 
 USAGE:
   printf("\nUsage options:\n");
-  printf("%s cmp <party_index> <num_parties (%lu)> [print_value (%d)]\n", argv[0], num_parties, print_values); 
+  printf("%s cmp <party_index> <num_parties (%lu)> [print_secrets (%d)]\n", argv[0], num_parties, print_secrets); 
   printf("%s paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
   //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
 
