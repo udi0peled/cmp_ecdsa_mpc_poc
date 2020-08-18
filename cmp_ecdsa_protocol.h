@@ -6,7 +6,7 @@
  *  Description:
  * 
  *  Proof of concept for the CMP protocol.
- *  Phasese: key generation, refresh and presigning.
+ *  Phasese: key generation, refresh and presign.
  *  Signing is done by non-interactively releasing the signature share for a given message.
  * 
  *  Structure cmp_party_t contains long term data for a party in the protocol.
@@ -24,7 +24,7 @@
  * 
  *  First initializing all parties in some order which is fixed and known to all parties (index sets the order).
  *  Then the following phases should be executed: key_generation and refresh_aux_info.
- *  Now each execution of presigning allows for a single signature_share execution to share a single message.
+ *  Now each execution of presign allows for a single signature_share execution to share a single message.
  *  Calling refresh_aux_info multiple times is also allows, but it deems the presigned data useless (can't be used to signature_share).
  * 
  *  In normal execution, each phase should follow the following function calls:
@@ -170,8 +170,31 @@ typedef struct
 } cmp_refresh_data_t;
 
 /**
- *  Temporary data for presigning phase
+ *  Temporary data for presign phase
  */
+
+typedef struct 
+{
+  scalar_t G;
+  scalar_t K;
+  scalar_t D;
+  scalar_t F;
+  scalar_t Dhat;
+  scalar_t Fhat;
+  gr_elem_t Delta;
+  gr_elem_t Gamma;
+
+  zkp_encryption_in_range_t                 *psi_enc;
+  zkp_operation_paillier_commitment_range_t *psi_affp;
+  zkp_operation_group_commitment_range_t    *psi_affg;
+  zkp_group_vs_paillier_range_t             *psi_logG;
+  zkp_group_vs_paillier_range_t             *psi_logK;
+
+  hash_chunk echo_broadcast;
+
+  uint64_t run_time;
+} cmp_presign_payload_t;
+
 
 typedef struct 
 {
@@ -197,17 +220,16 @@ typedef struct
   gr_elem_t Gamma;
   gr_elem_t combined_Gamma;
 
-  zkp_aux_info_t                            *aux;
-  zkp_encryption_in_range_t                 **psi_enc;
-  zkp_operation_paillier_commitment_range_t **psi_affp;
-  zkp_operation_group_commitment_range_t    **psi_affg;
-  zkp_group_vs_paillier_range_t             **psi_logG;
-  zkp_group_vs_paillier_range_t             **psi_logK;
+  zkp_encryption_in_range_t                 **psi_enc_j;
+  zkp_operation_paillier_commitment_range_t **psi_affp_j;
+  zkp_operation_group_commitment_range_t    **psi_affg_j;
+  zkp_group_vs_paillier_range_t             **psi_logG_j;
+  zkp_group_vs_paillier_range_t             **psi_logK_j;
 
-  hash_chunk echo_broadcast;
+  uint8_t *echo_broadcast;
 
   uint64_t run_time;
-} cmp_presigning_t;
+} cmp_presign_data_t;
 
 /**
  *  Long term data for party.
@@ -243,7 +265,7 @@ typedef struct cmp_party_t
   // Temporary data for relevant phase
   cmp_key_generation_data_t *key_generation_data;
   cmp_refresh_data_t    *refresh_data;
-  cmp_presigning_t          *presigning_data;
+  cmp_presign_data_t          *presign_data;
 
   // Generated signature share
   gr_elem_t R;
@@ -272,12 +294,12 @@ void cmp_refresh_aux_info_round_2_exec (cmp_party_t *party);
 void cmp_refresh_aux_info_round_3_exec (cmp_party_t *party);
 void cmp_refresh_aux_info_final_exec   (cmp_party_t *party);
 
-void cmp_presigning_init         (cmp_party_t *party);
-void cmp_presigning_clean        (cmp_party_t *party);
-void cmp_presigning_round_1_exec (cmp_party_t *party);
-void cmp_presigning_round_2_exec (cmp_party_t *party);
-void cmp_presigning_round_3_exec (cmp_party_t *party);
-void cmp_presigning_final_exec   (cmp_party_t *party);
+void cmp_presign_init         (cmp_party_t *party);
+void cmp_presign_clean        (cmp_party_t *party);
+void cmp_presign_round_1_exec (cmp_party_t *party);
+void cmp_presign_round_2_exec (cmp_party_t *party);
+void cmp_presign_round_3_exec (cmp_party_t *party);
+void cmp_presign_final_exec   (cmp_party_t *party);
 
 void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, const scalar_t msg);
 

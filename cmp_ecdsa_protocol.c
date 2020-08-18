@@ -165,7 +165,7 @@ cmp_party_t *cmp_party_new (uint64_t party_index, uint64_t num_parties, const ui
 
   party->key_generation_data = NULL;
   party->refresh_data = NULL;
-  party->presigning_data = NULL;
+  party->presign_data = NULL;
 
   return party;
 }
@@ -1046,6 +1046,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
     zkp_schnorr_prove(reda->psi_sch_j[j], aux, reda->tau_j[j]);
   }
   scalar_free(temp_paillier_rand);
+  zkp_aux_info_free(aux);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   reda->run_time += time_diff;
@@ -1197,6 +1198,7 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
     }
   }
   scalar_free(received_reshare);
+  zkp_aux_info_free(aux);
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1273,10 +1275,10 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
  ********************************************/
 
 
-void cmp_presigning_init(cmp_party_t *party)
+void cmp_presign_init(cmp_party_t *party)
 {
-  cmp_presigning_t *preda = malloc(sizeof(*preda));
-  party->presigning_data = preda;
+  cmp_presign_data_t *preda = malloc(sizeof(*preda));
+  party->presign_data = preda;
 
   preda->G     = scalar_new();
   preda->K     = scalar_new();
@@ -1330,9 +1332,9 @@ void cmp_presigning_init(cmp_party_t *party)
   preda->run_time = 0;
 }
 
-void cmp_presigning_clean(cmp_party_t *party)
+void cmp_presign_clean(cmp_party_t *party)
 {
-  cmp_presigning_t *preda = party->presigning_data;
+  cmp_presign_data_t *preda = party->presign_data;
 
   scalar_free(preda->G    );
   scalar_free(preda->K    );
@@ -1387,12 +1389,12 @@ void cmp_presigning_clean(cmp_party_t *party)
 }
 
 /*
-void cmp_presigning_round_1_exec (cmp_party_t *party)
+void cmp_presign_round_1_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_presigning_t *preda = party->presigning_data;
+  cmp_presign_data_t *preda = party->presign_data;
 
   paillier_encryption_sample(preda->rho, &party->paillier_priv->pub);
   scalar_sample_in_range(preda->k, party->ec_order, 0);
@@ -1434,12 +1436,12 @@ void cmp_presigning_round_1_exec (cmp_party_t *party)
   printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
 }
 
-void  cmp_presigning_round_2_exec (cmp_party_t *party)
+void  cmp_presign_round_2_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_presigning_t *preda = party->presigning_data;
+  cmp_presign_data_t *preda = party->presign_data;
 
   int *verified_psi_enc = calloc(party->num_parties, sizeof(int));
 
@@ -1450,9 +1452,9 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
   SHA512_Init(&sha_ctx);
   for (uint64_t i = 0; i < party->num_parties; ++i)
   {
-    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->K, 0);
+    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presign_data->K, 0);
     SHA512_Update(&sha_ctx, temp_bytes, PAILLIER_MODULUS_BYTES);
-    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presigning_data->G, 0);
+    scalar_to_bytes(&temp_bytes, PAILLIER_MODULUS_BYTES, party->parties[i]->presign_data->G, 0);
     SHA512_Update(&sha_ctx, temp_bytes, PAILLIER_MODULUS_BYTES);
   }
   SHA512_Final(preda->echo_broadcast, &sha_ctx);
@@ -1464,7 +1466,7 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
     if (j == party->index) continue;
 
     zkp_aux_info_update(preda->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
-    verified_psi_enc[j] = zkp_encryption_in_range_verify(party->parties[j]->presigning_data->psi_enc[party->index], preda->aux);
+    verified_psi_enc[j] = zkp_encryption_in_range_verify(party->parties[j]->presign_data->psi_enc[party->index], preda->aux);
     if (verified_psi_enc[j] != 1)  printf("%sParty %lu: failed verification of psi_enc from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
   }
   free(verified_psi_enc);
@@ -1495,12 +1497,12 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
     // ARTICLE-MOD: using \beta (and not -\beta) for both F and affine operation (later will compute \alpha-\beta in summation)
     paillier_encryption_sample(s, party->paillier_pub[j]);
     paillier_encryption_encrypt(temp_enc, preda->beta_j[j], s, party->paillier_pub[j]);
-    paillier_encryption_homomorphic(preda->D_j[j], party->parties[j]->presigning_data->K, preda->gamma, temp_enc, party->paillier_pub[j]);
+    paillier_encryption_homomorphic(preda->D_j[j], party->parties[j]->presign_data->K, preda->gamma, temp_enc, party->paillier_pub[j]);
 
     preda->psi_affp[j]->public.paillier_pub_0 = party->paillier_pub[j];
     preda->psi_affp[j]->public.paillier_pub_1 = &party->paillier_priv->pub;
     preda->psi_affp[j]->public.rped_pub = party->rped_pub[j];
-    preda->psi_affp[j]->public.C = party->parties[j]->presigning_data->K;
+    preda->psi_affp[j]->public.C = party->parties[j]->presign_data->K;
     preda->psi_affp[j]->public.G = party->ec;
     preda->psi_affp[j]->public.D = preda->D_j[j];
     preda->psi_affp[j]->public.X = preda->G;
@@ -1524,14 +1526,14 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
     // ARTICLE-MOD: using \betahat (and not -\betahat) for both F and affine operation (later will compute \alphahat-\betahat in summation)
     paillier_encryption_sample(s, party->paillier_pub[j]);
     paillier_encryption_encrypt(temp_enc, preda->betahat_j[j], s, party->paillier_pub[j]);
-    paillier_encryption_homomorphic(preda->Dhat_j[j], party->parties[j]->presigning_data->K, party->secret_x, temp_enc, party->paillier_pub[j]);
+    paillier_encryption_homomorphic(preda->Dhat_j[j], party->parties[j]->presign_data->K, party->secret_x, temp_enc, party->paillier_pub[j]);
 
     preda->psi_affg[j]->public.paillier_pub_0 = party->paillier_pub[j];
     preda->psi_affg[j]->public.paillier_pub_1 = &party->paillier_priv->pub;
     preda->psi_affg[j]->public.rped_pub = party->rped_pub[j];
     preda->psi_affg[j]->public.G = party->ec;
     preda->psi_affg[j]->public.g = party->ec_gen;
-    preda->psi_affg[j]->public.C = party->parties[j]->presigning_data->K;
+    preda->psi_affg[j]->public.C = party->parties[j]->presign_data->K;
     preda->psi_affg[j]->public.D = preda->Dhat_j[j];
     preda->psi_affg[j]->public.X = party->public_X[party->index];
     preda->psi_affg[j]->public.Y = preda->Fhat_j[j];
@@ -1585,12 +1587,12 @@ void  cmp_presigning_round_2_exec (cmp_party_t *party)
   }
 }
 
-void  cmp_presigning_round_3_exec (cmp_party_t *party)
+void  cmp_presign_round_3_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_presigning_t *preda = party->presigning_data;
+  cmp_presign_data_t *preda = party->presign_data;
   
   // Verify ZKP
 
@@ -1604,9 +1606,9 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
 
     zkp_aux_info_update(preda->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
 
-    verified_psi_affp[j] = zkp_operation_paillier_commitment_range_verify(party->parties[j]->presigning_data->psi_affp[party->index], preda->aux);
-    verified_psi_affg[j] = zkp_operation_group_commitment_range_verify(party->parties[j]->presigning_data->psi_affg[party->index], preda->aux);
-    verified_psi_logG[j] = zkp_group_vs_paillier_range_verify(party->parties[j]->presigning_data->psi_logG[party->index], preda->aux);
+    verified_psi_affp[j] = zkp_operation_paillier_commitment_range_verify(party->parties[j]->presign_data->psi_affp[party->index], preda->aux);
+    verified_psi_affg[j] = zkp_operation_group_commitment_range_verify(party->parties[j]->presign_data->psi_affg[party->index], preda->aux);
+    verified_psi_logG[j] = zkp_group_vs_paillier_range_verify(party->parties[j]->presign_data->psi_logG[party->index], preda->aux);
 
     if (verified_psi_affp[j] != 1) printf("%sParty %lu: failed verification of psi_affp from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
     if (verified_psi_affg[j] != 1) printf("%sParty %lu: failed verification of psi_affg from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
@@ -1619,7 +1621,7 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   group_operation(preda->combined_Gamma, NULL, NULL, NULL, party->ec);
   for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
-    group_operation(preda->combined_Gamma, preda->combined_Gamma, party->parties[i]->presigning_data->Gamma, NULL, party->ec);
+    group_operation(preda->combined_Gamma, preda->combined_Gamma, party->parties[i]->presign_data->Gamma, NULL, party->ec);
   }
   
   group_operation(preda->Delta, NULL, preda->combined_Gamma, preda->k, party->ec);
@@ -1636,13 +1638,13 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
     if (j == party->index) continue;
     
     // Compute delta_i
-    paillier_encryption_decrypt(alpha_j, party->parties[j]->presigning_data->D_j[party->index], party->paillier_priv);
+    paillier_encryption_decrypt(alpha_j, party->parties[j]->presign_data->D_j[party->index], party->paillier_priv);
     scalar_make_plus_minus(alpha_j, party->paillier_priv->pub.N);
     scalar_add(preda->delta, preda->delta, alpha_j, party->ec_order);
     scalar_sub(preda->delta, preda->delta, preda->beta_j[j], party->ec_order);
 
     // Compute chi_i
-    paillier_encryption_decrypt(alpha_j, party->parties[j]->presigning_data->Dhat_j[party->index], party->paillier_priv);
+    paillier_encryption_decrypt(alpha_j, party->parties[j]->presign_data->Dhat_j[party->index], party->paillier_priv);
     scalar_make_plus_minus(alpha_j, party->paillier_priv->pub.N);
     scalar_add(preda->chi, preda->chi, alpha_j, party->ec_order);
     scalar_sub(preda->chi, preda->chi, preda->betahat_j[j], party->ec_order);
@@ -1677,12 +1679,12 @@ void  cmp_presigning_round_3_exec (cmp_party_t *party)
   printf("Delta_%lu = ", party->index); printECPOINT("", preda->Delta, party->ec, "\n", 1);
 }
 
-void  cmp_presigning_final_exec (cmp_party_t *party)
+void  cmp_presign_final_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
   uint64_t time_diff;
 
-  cmp_presigning_t *preda = party->presigning_data;
+  cmp_presign_data_t *preda = party->presign_data;
   
   // Verify ZKP
 
@@ -1694,7 +1696,7 @@ void  cmp_presigning_final_exec (cmp_party_t *party)
     if (j == party->index) continue; 
 
     zkp_aux_info_update(preda->aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
-    verified_psi_logK[j] = zkp_group_vs_paillier_range_verify(party->parties[j]->presigning_data->psi_logK[party->index], preda->aux);
+    verified_psi_logK[j] = zkp_group_vs_paillier_range_verify(party->parties[j]->presign_data->psi_logK[party->index], preda->aux);
     if (verified_psi_logK[j] != 1) printf("%sParty %lu: failed verification of psi_logK from Party %lu\n",ERR_STR, party->id, party->parties_ids[j]);
   }
   free(verified_psi_logK);
@@ -1707,8 +1709,8 @@ void  cmp_presigning_final_exec (cmp_party_t *party)
   group_operation(combined_Delta, NULL, NULL, NULL, party->ec);
   for (uint64_t i = 0; i < party->num_parties; ++i) 
   {
-    scalar_add(combined_delta, combined_delta, party->parties[i]->presigning_data->delta, party->ec_order);
-    group_operation(combined_Delta, combined_Delta, party->parties[i]->presigning_data->Delta, NULL, party->ec);
+    scalar_add(combined_delta, combined_delta, party->parties[i]->presign_data->delta, party->ec_order);
+    group_operation(combined_Delta, combined_Delta, party->parties[i]->presign_data->Delta, NULL, party->ec);
   }
   group_operation(gen_to_delta, NULL, party->ec_gen, combined_delta, party->ec);
   assert(PAILLIER_MODULUS_BYTES >= CALIGRAPHIC_J_ZKP_RANGE_BYTES);    // The following ZKP is valid when N is bigger then beta's range)

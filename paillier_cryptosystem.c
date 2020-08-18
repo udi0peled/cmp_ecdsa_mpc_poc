@@ -50,6 +50,8 @@ void paillier_encryption_generate_private (paillier_private_key_t *priv, uint64_
 
   scalar_free(p);
   scalar_free(q);
+  scalar_free(three);
+  scalar_free(four);
 }
 
 paillier_public_key_t *paillier_encryption_public_new ()

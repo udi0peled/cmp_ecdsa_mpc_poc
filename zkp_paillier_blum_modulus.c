@@ -231,7 +231,7 @@ void zkp_paillier_blum_proof_from_bytes (zkp_paillier_blum_modulus_t *zkp, uint8
   }
   uint8_t *read_bytes = *bytes;
   
-  scalar_to_bytes(&read_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
+  scalar_from_bytes(zkp->proof.w, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
   {
     scalar_from_bytes(zkp->proof.x[i], &read_bytes, PAILLIER_MODULUS_BYTES, 1);
