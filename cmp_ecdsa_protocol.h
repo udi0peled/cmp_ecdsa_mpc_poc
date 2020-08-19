@@ -228,6 +228,8 @@ typedef struct
 
   uint8_t *echo_broadcast;
 
+  cmp_presign_payload_t **payload;
+
   uint64_t run_time;
 } cmp_presign_data_t;
 

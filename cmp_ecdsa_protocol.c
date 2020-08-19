@@ -304,7 +304,7 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_send_bytes(party->index, j, 1, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 11, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -334,7 +334,7 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 1, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 11, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     cmp_void_from_bytes(kgd->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
@@ -342,7 +342,7 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
     assert(curr_recv == recv_bytes + recv_bytes_len);
 
     printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("V_%lu= ", j); printHexBytes("0x", kgd->payload[j]->V, sizeof(hash_chunk), "\n", 0);
+    printf("V_%lu = ", j); printHexBytes("0x", kgd->payload[j]->V, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
 
@@ -378,7 +378,7 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_send_bytes(party->index, j, 2, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 12, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -407,7 +407,7 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 2, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 12, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     cmp_void_from_bytes(kgd->payload[j]->u, &curr_recv, sizeof(hash_chunk), 1);
@@ -494,7 +494,7 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_send_bytes(party->index, j, 3, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 13, send_bytes, send_bytes_len);
   }
   free(send_bytes);
   
@@ -522,7 +522,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 3, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 13, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
     
     kgd->payload[j]->psi_sch->public.G = party->ec;
@@ -791,7 +791,7 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_send_bytes(party->index, j, 1, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 21, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -825,7 +825,7 @@ void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 1, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 21, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     cmp_void_from_bytes(reda->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
@@ -882,7 +882,7 @@ void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
 
-    cmp_comm_send_bytes(party->index, j, 2, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 22, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -924,7 +924,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 2, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 22, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     cmp_void_from_bytes(reda->payload[j]->u, &curr_recv, sizeof(hash_chunk), 1);
@@ -1079,7 +1079,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
 
-    cmp_comm_send_bytes(party->index, j, 3, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 23, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -1118,7 +1118,7 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 3, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 23, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
     
     reda->payload[j]->psi_mod->public = reda->payload[j]->paillier_pub;
@@ -1280,18 +1280,36 @@ void cmp_presign_init(cmp_party_t *party)
   cmp_presign_data_t *preda = malloc(sizeof(*preda));
   party->presign_data = preda;
 
-  preda->G     = scalar_new();
-  preda->K     = scalar_new();
+  // Initialize payloads from other parties (and sent by self at my index)
+
+  preda->payload = calloc(party->num_parties, sizeof(cmp_presign_payload_t*));
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    preda->payload[j] = malloc(sizeof(cmp_presign_payload_t));
+    preda->payload[j]->G     = scalar_new();
+    preda->payload[j]->K     = scalar_new();
+    preda->payload[j]->D     = scalar_new();
+    preda->payload[j]->F     = scalar_new();
+    preda->payload[j]->Dhat  = scalar_new();
+    preda->payload[j]->Fhat  = scalar_new();
+    preda->payload[j]->Delta = group_elem_new(party->ec);
+    preda->payload[j]->Gamma = group_elem_new(party->ec);
+
+    preda->payload[j]->psi_enc  = zkp_encryption_in_range_new();
+    preda->payload[j]->psi_affp = zkp_operation_paillier_commitment_range_new();
+    preda->payload[j]->psi_affg = zkp_operation_group_commitment_range_new();
+    preda->payload[j]->psi_logG = zkp_group_vs_paillier_range_new();
+    preda->payload[j]->psi_logK = zkp_group_vs_paillier_range_new();
+  }
+
+  // Init self private values
+
   preda->k     = scalar_new();
-  preda->gamma = scalar_new();
   preda->rho   = scalar_new();
   preda->nu    = scalar_new();
+  preda->gamma = scalar_new();
   preda->delta = scalar_new();
   preda->chi   = scalar_new();
-
-  preda->Delta          = group_elem_new(party->ec);
-  preda->Gamma          = group_elem_new(party->ec);
-  preda->combined_Gamma = group_elem_new(party->ec);
 
   preda->alpha_j    = calloc(party->num_parties, sizeof(scalar_t));
   preda->beta_j     = calloc(party->num_parties, sizeof(scalar_t));
@@ -1302,15 +1320,14 @@ void cmp_presign_init(cmp_party_t *party)
   preda->Dhat_j     = calloc(party->num_parties, sizeof(scalar_t));
   preda->Fhat_j     = calloc(party->num_parties, sizeof(scalar_t));
 
-  preda->psi_enc  = calloc(party->num_parties, sizeof(zkp_encryption_in_range_t));
-  preda->psi_affp = calloc(party->num_parties, sizeof(zkp_operation_paillier_commitment_range_t));
-  preda->psi_affg = calloc(party->num_parties, sizeof(zkp_operation_group_commitment_range_t));
-  preda->psi_logG = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
-  preda->psi_logK = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
+  preda->psi_enc_j  = calloc(party->num_parties, sizeof(zkp_encryption_in_range_t));
+  preda->psi_affp_j = calloc(party->num_parties, sizeof(zkp_operation_paillier_commitment_range_t));
+  preda->psi_affg_j = calloc(party->num_parties, sizeof(zkp_operation_group_commitment_range_t));
+  preda->psi_logG_j = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
+  preda->psi_logK_j = calloc(party->num_parties, sizeof(zkp_group_vs_paillier_range_t));
 
-  preda->aux      = zkp_aux_info_new(sizeof(hash_chunk) + sizeof(uint64_t), NULL);      // Prepate for (sid_hash, i);
-  
-  for (uint64_t j = 0; j < party->num_parties; ++j){
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
     preda->alpha_j[j]    = scalar_new();
     preda->beta_j[j]     = scalar_new();
     preda->alphahat_j[j] = scalar_new();
@@ -1320,14 +1337,21 @@ void cmp_presign_init(cmp_party_t *party)
     preda->Dhat_j[j]     = scalar_new();
     preda->Fhat_j[j]     = scalar_new();
 
-    if (j == party->index) continue;
-
-    preda->psi_enc [j] = zkp_encryption_in_range_new();
-    preda->psi_affp[j] = zkp_operation_paillier_commitment_range_new();
-    preda->psi_affg[j] = zkp_operation_group_commitment_range_new();
-    preda->psi_logG[j] = zkp_group_vs_paillier_range_new();
-    preda->psi_logK[j] = zkp_group_vs_paillier_range_new();
+    preda->psi_enc_j[j]  = zkp_encryption_in_range_new();
+    preda->psi_affp_j[j] = zkp_operation_paillier_commitment_range_new();
+    preda->psi_affg_j[j] = zkp_operation_group_commitment_range_new();
+    preda->psi_logG_j[j] = zkp_group_vs_paillier_range_new();
+    preda->psi_logK_j[j] = zkp_group_vs_paillier_range_new();
   }
+
+  preda->combined_Gamma = group_elem_new(party->ec);
+  
+  // Pointer to data stored at payload, but generated by self
+  preda->G              = preda->payload[party->index]->G;
+  preda->K              = preda->payload[party->index]->K;
+  preda->Delta          = preda->payload[party->index]->Delta;
+  preda->Gamma          = preda->payload[party->index]->Gamma;
+  preda->echo_broadcast = preda->payload[party->index]->echo_broadcast;
 
   preda->run_time = 0;
 }
@@ -1336,17 +1360,35 @@ void cmp_presign_clean(cmp_party_t *party)
 {
   cmp_presign_data_t *preda = party->presign_data;
 
-  scalar_free(preda->G    );
-  scalar_free(preda->K    );
-  scalar_free(preda->k    );
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    preda->payload[j] = malloc(sizeof(cmp_presign_payload_t));
+    scalar_free(preda->payload[j]->G);
+    scalar_free(preda->payload[j]->K);
+    scalar_free(preda->payload[j]->D);
+    scalar_free(preda->payload[j]->F);
+    scalar_free(preda->payload[j]->Dhat);
+    scalar_free(preda->payload[j]->Fhat);
+    group_elem_free(preda->payload[j]->Delta);
+    group_elem_free(preda->payload[j]->Gamma);
+
+    if (j == party->index) continue;
+
+    zkp_encryption_in_range_free(preda->payload[j]->psi_enc );
+    zkp_operation_paillier_commitment_range_free(preda->payload[j]->psi_affp);
+    zkp_operation_group_commitment_range_free(preda->payload[j]->psi_affg);
+    zkp_group_vs_paillier_range_free(preda->payload[j]->psi_logG);
+    zkp_group_vs_paillier_range_free(preda->payload[j]->psi_logK);
+  }
+  free(preda->payload);
+
+  scalar_free(preda->k);
+  scalar_free(preda->rho);
+  scalar_free(preda->nu);
   scalar_free(preda->gamma);
-  scalar_free(preda->rho  );
-  scalar_free(preda->nu   );
   scalar_free(preda->delta);
   scalar_free(preda->chi);
 
-  group_elem_free(preda->Delta         );
-  group_elem_free(preda->Gamma         );
   group_elem_free(preda->combined_Gamma);
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -1354,88 +1396,120 @@ void cmp_presign_clean(cmp_party_t *party)
     scalar_free(preda->alpha_j[j]);
     scalar_free(preda->beta_j[j] );
     scalar_free(preda->alphahat_j[j]);
-    scalar_free(preda->betahat_j[j] );
-    scalar_free(preda->D_j[j]    );
-    scalar_free(preda->F_j[j]    );
-    scalar_free(preda->Dhat_j[j] );
-    scalar_free(preda->Fhat_j[j] );
+    scalar_free(preda->betahat_j[j]);
+    scalar_free(preda->D_j[j]);
+    scalar_free(preda->F_j[j]);
+    scalar_free(preda->Dhat_j[j]);
+    scalar_free(preda->Fhat_j[j]);
 
     if (j == party->index) continue;
 
-    zkp_encryption_in_range_free(preda->psi_enc [j]);
-    zkp_operation_paillier_commitment_range_free(preda->psi_affp[j]);
-    zkp_operation_group_commitment_range_free(preda->psi_affg[j]);
-    zkp_group_vs_paillier_range_free(preda->psi_logG [j]);
-    zkp_group_vs_paillier_range_free(preda->psi_logK [j]);
+    zkp_encryption_in_range_free(preda->psi_enc_j [j]);
+    zkp_operation_paillier_commitment_range_free(preda->psi_affp_j[j]);
+    zkp_operation_group_commitment_range_free(preda->psi_affg_j[j]);
+    zkp_group_vs_paillier_range_free(preda->psi_logG_j[j]);
+    zkp_group_vs_paillier_range_free(preda->psi_logK_j[j]);
   }
-
-  zkp_aux_info_free(preda->aux);
 
   free(preda->alphahat_j);
   free(preda->betahat_j );
   free(preda->alpha_j);
-  free(preda->beta_j );
-  free(preda->D_j    );
-  free(preda->F_j    );
-  free(preda->Dhat_j );
-  free(preda->Fhat_j );
+  free(preda->beta_j);
+  free(preda->D_j);
+  free(preda->F_j);
+  free(preda->Dhat_j);
+  free(preda->Fhat_j);
 
-  free(preda->psi_enc );
-  free(preda->psi_affp);
-  free(preda->psi_affg);
-  free(preda->psi_logG);
-  free(preda->psi_logK);
+  free(preda->psi_enc_j);
+  free(preda->psi_affp_j);
+  free(preda->psi_affg_j);
+  free(preda->psi_logG_j);
+  free(preda->psi_logK_j);
   free(preda);
 }
 
-/*
 void cmp_presign_round_1_exec (cmp_party_t *party)
 {
+   printf("### Presign Phase, Round 1, Party %lu.\n", party->index);
+
   clock_t time_start = clock();
   uint64_t time_diff;
 
   cmp_presign_data_t *preda = party->presign_data;
 
-  paillier_encryption_sample(preda->rho, &party->paillier_priv->pub);
+  paillier_encryption_sample(preda->rho, party->paillier_pub[party->index]);
   scalar_sample_in_range(preda->k, party->ec_order, 0);
-  paillier_encryption_encrypt(preda->K, preda->k, preda->rho, &party->paillier_priv->pub);
+  paillier_encryption_encrypt(preda->K, preda->k, preda->rho, party->paillier_pub[party->index]);
 
-  paillier_encryption_sample(preda->nu, &party->paillier_priv->pub);
+  paillier_encryption_sample(preda->nu, party->paillier_pub[party->index]);
   scalar_sample_in_range(preda->gamma, party->ec_order, 0);
-  paillier_encryption_encrypt(preda->G, preda->gamma, preda->nu, &party->paillier_priv->pub);
+  paillier_encryption_encrypt(preda->G, preda->gamma, preda->nu, party->paillier_pub[party->index]);
 
+  // Aux Info for ZKP (ssid, i)
+  zkp_aux_info_t *aux = zkp_aux_info_new(sizeof(uint64_t) + sizeof(hash_chunk), NULL);
   uint64_t aux_pos = 0;
-  zkp_aux_info_update_move(preda->aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
-  zkp_aux_info_update_move(preda->aux, &aux_pos, &party->id, sizeof(uint64_t));
-  assert(preda->aux->info_len == aux_pos);
+  zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));
+  assert(aux->info_len == aux_pos);
 
   for (uint64_t j = 0; j < party->num_parties; ++j) 
   {
     if (j == party->index) continue;
 
-    preda->psi_enc[j]->public.paillier_pub = &party->paillier_priv->pub;
-    preda->psi_enc[j]->public.rped_pub = party->rped_pub[j];
-    preda->psi_enc[j]->public.G = party->ec;
-    preda->psi_enc[j]->public.K = preda->K;
-    preda->psi_enc[j]->public.k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
-    preda->psi_enc[j]->secret.k = preda->k;
-    preda->psi_enc[j]->secret.rho = preda->rho;
-    zkp_encryption_in_range_prove(preda->psi_enc[j], preda->aux);
+    preda->psi_enc_j[j]->public.paillier_pub = party->paillier_pub[party->index];
+    preda->psi_enc_j[j]->public.rped_pub = party->rped_pub[j];
+    preda->psi_enc_j[j]->public.G = party->ec;
+    preda->psi_enc_j[j]->public.K = preda->K;
+    preda->psi_enc_j[j]->public.k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
+    preda->psi_enc_j[j]->secret.k = preda->k;
+    preda->psi_enc_j[j]->secret.rho = preda->rho;
+    zkp_encryption_in_range_prove(preda->psi_enc_j[j], aux);
   }
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
 
+  // Send payload
+
   uint64_t psi_enc_bytes;
   zkp_encryption_in_range_proof_to_bytes(NULL, &psi_enc_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
-  printf("### Round 1. Party %lu broadcasts (K_i, G_i). Send (psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", party->id,
-    2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * psi_enc_bytes, time_diff);
+
+  uint64_t send_bytes_len =  psi_enc_bytes + 4*PAILLIER_MODULUS_BYTES;
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->K, 1);
+  scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->G, 1);
+
+  uint8_t *individual_send_start = curr_send;
+  
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
+
+    curr_send = individual_send_start;
+    zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytes, preda->psi_enc_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+    assert(curr_send == send_bytes + send_bytes_len);
+
+    cmp_comm_send_bytes(party->index, j, 31, send_bytes, send_bytes_len);
+  }
+  free(send_bytes);
+
+  // Print
+
+  printf("### Broadcast (K_i, G_i). Send (psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n",     2*sizeof(hash_chunk) + sizeof(uint64_t) + 4*PAILLIER_MODULUS_BYTES + (party->num_parties-1) * psi_enc_bytes, time_diff);
+
+  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
+  printf("K_%lu = ", party->index); printBIGNUM("", preda->K, "\n");
+  printf("G_%lu = ", party->index); printBIGNUM("", preda->G, "\n");
+  printf("psi_enc_j[%lu] = ...\n", party->num_parties);
 
   if (!PRINT_SECRETS) return;
-  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
   printf("k_%lu = ", party->index); printBIGNUM("", preda->k, "\n");
   printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
+  printf("rho_%lu = ", party->index); printBIGNUM("", preda->rho, "\n");
+  printf("nu_%lu = ", party->index); printBIGNUM("", preda->nu, "\n");
 }
-
+/*
 void  cmp_presign_round_2_exec (cmp_party_t *party)
 {
   clock_t time_start = clock();
