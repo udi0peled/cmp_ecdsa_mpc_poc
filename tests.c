@@ -417,15 +417,14 @@ void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[], uint64_t num_parti
   free(pub);
 }
 
-void execute_presign (cmp_party_t *parties[], uint64_t num_parties)
+void execute_presign (cmp_party_t *party)
 {
-  // Execute Key Generation for all
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_init(parties[i]);
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_round_1_exec(parties[i]);
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_round_2_exec(parties[i]);
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_round_3_exec(parties[i]);
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_final_exec(parties[i]);
-  // for (uint64_t i = 0; i < num_parties; ++i) cmp_presign_clean(parties[i]);
+  cmp_presign_init(party);
+  cmp_presign_round_1_exec(party);
+  cmp_presign_round_2_exec(party);
+  cmp_presign_round_3_exec(party);
+  cmp_presign_final_exec(party);
+  cmp_presign_clean(party);
 }
 
 int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
@@ -515,8 +514,8 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_secrets
   printf("\n\n# Refrsh and Auxliarty Information\n\n");
   execute_refresh_and_aux_info(party);
 
-  // printf("\n\n# Pre-Signing\n\n");
-  // execute_presign(parties, num_parties);
+  printf("\n\n# PreSign\n\n");
+  execute_presign(party);
 
   // printf("\n\n# Signing\n\n");
   // execute_signing(parties, num_parties);

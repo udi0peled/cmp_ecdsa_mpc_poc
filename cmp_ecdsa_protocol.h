@@ -175,12 +175,13 @@ typedef struct
 
 typedef struct 
 {
-  scalar_t G;
-  scalar_t K;
-  scalar_t D;
-  scalar_t F;
-  scalar_t Dhat;
-  scalar_t Fhat;
+  scalar_t  G;
+  scalar_t  K;
+  scalar_t  D;
+  scalar_t  F;
+  scalar_t  Dhat;
+  scalar_t  Fhat;
+  scalar_t  delta;
   gr_elem_t Delta;
   gr_elem_t Gamma;
 
