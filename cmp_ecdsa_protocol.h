@@ -208,9 +208,9 @@ typedef struct
   scalar_t delta;
   scalar_t chi;
 
-  scalar_t *alpha_j;
+  //scalar_t *alpha_j;
   scalar_t *beta_j;
-  scalar_t *alphahat_j;
+  //scalar_t *alphahat_j;
   scalar_t *betahat_j;
   scalar_t *D_j;
   scalar_t *F_j;

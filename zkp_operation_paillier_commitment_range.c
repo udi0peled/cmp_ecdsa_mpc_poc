@@ -261,7 +261,7 @@ void zkp_operation_paillier_commitment_range_proof_to_bytes(uint8_t **bytes, uin
   scalar_to_bytes(&set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
   scalar_to_bytes(&set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_2, 1);
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_4, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_4, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w_x, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w_y, 1);
@@ -292,7 +292,7 @@ void zkp_operation_paillier_commitment_range_proof_from_bytes(zkp_operation_pail
   scalar_from_bytes(zkp->proof.z_1, &set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.z_2, &set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.z_3, &set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
-  scalar_from_bytes(zkp->proof.z_4, &set_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_4, &set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.w, &set_bytes, PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.w_x, &set_bytes, PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.w_y, &set_bytes, PAILLIER_MODULUS_BYTES, 1);

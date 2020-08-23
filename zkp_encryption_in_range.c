@@ -2,7 +2,7 @@
 
 zkp_encryption_in_range_t *zkp_encryption_in_range_new ()
 {
-  zkp_encryption_in_range_t *zkp = malloc(sizeof(*zkp));  
+  zkp_encryption_in_range_t *zkp = malloc(sizeof(zkp_encryption_in_range_t));  
   
   zkp->proof.A    = scalar_new();
   zkp->proof.C    = scalar_new();

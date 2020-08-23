@@ -258,7 +258,7 @@ void zkp_operation_group_commitment_range_proof_to_bytes(uint8_t **bytes, uint64
   scalar_to_bytes(&set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
   scalar_to_bytes(&set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_2, 1);
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_4, 1);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_4, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w_y, 1);
 
@@ -290,7 +290,7 @@ void zkp_operation_group_commitment_range_proof_from_bytes(zkp_operation_group_c
   scalar_from_bytes(zkp->proof.z_1, &read_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.z_2, &read_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
-  scalar_from_bytes(zkp->proof.z_4, &read_bytes, RING_PED_MODULUS_BYTES + y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_from_bytes(zkp->proof.z_4, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
   scalar_from_bytes(zkp->proof.w, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.w_y, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
 

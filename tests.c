@@ -510,12 +510,15 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_secrets
 
   printf("\n\n# Key Generation\n\n");
   execute_key_generation(party);
+  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
 
   printf("\n\n# Refrsh and Auxliarty Information\n\n");
   execute_refresh_and_aux_info(party);
+  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
 
   printf("\n\n# PreSign\n\n");
   execute_presign(party);
+  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
 
   // printf("\n\n# Signing\n\n");
   // execute_signing(parties, num_parties);
