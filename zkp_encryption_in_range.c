@@ -51,7 +51,7 @@ void zkp_encryption_in_range_challenge (scalar_t e, zkp_encryption_in_range_t *z
   assert(fs_data + fs_data_len == data_pos);
 
   fiat_shamir_scalars_in_range(&e, 1, ec_group_order(zkp->public.G), fs_data, fs_data_len);
-  scalar_make_plus_minus(e, ec_group_order(zkp->public.G));
+  scalar_make_signed(e, ec_group_order(zkp->public.G));
 
   free(fs_data);
 }
@@ -73,17 +73,17 @@ void zkp_encryption_in_range_prove (zkp_encryption_in_range_t *zkp, const zkp_au
 
   BN_set_bit(alpha_range, 8*zkp->public.k_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(alpha, alpha_range, 0);
-  scalar_make_plus_minus(alpha, alpha_range);
+  scalar_make_signed(alpha, alpha_range);
 
   BN_set_bit(gamma_range, 8*zkp->public.k_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   BN_mul(gamma_range, gamma_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(gamma, gamma_range, 0);
-  scalar_make_plus_minus(gamma, gamma_range);
+  scalar_make_signed(gamma, gamma_range);
   
   BN_set_bit(mu_range, 8*zkp->public.k_range_bytes);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
-  scalar_make_plus_minus(mu, mu_range);
+  scalar_make_signed(mu, mu_range);
   
   paillier_encryption_sample(r, zkp->public.paillier_pub);
   paillier_encryption_encrypt(zkp->proof.A, alpha, r, zkp->public.paillier_pub);
@@ -156,13 +156,28 @@ void zkp_encryption_in_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len,
   }
   uint8_t *set_bytes = *bytes;
 
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);
+  scalar_t mod_range = scalar_new();
+  scalar_t unsigned_scalar = scalar_new();
+
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);  
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.C, 1);
-  scalar_to_bytes(&set_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_1);
+  scalar_set_power_of_2(mod_range, 8*(k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
+
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.z_2, 1);
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_3);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
   
+  scalar_free(mod_range);
+  scalar_free(unsigned_scalar);
+
   assert(set_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = set_bytes;
@@ -170,7 +185,8 @@ void zkp_encryption_in_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len,
 
 void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t k_range_bytes, int move_to_end)
 { 
-  uint64_t needed_byte_len = 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*k_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+  uint64_t needed_byte_len;
+  zkp_encryption_in_range_proof_to_bytes(NULL, &needed_byte_len, NULL, k_range_bytes, 0);
 
   if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
   {
@@ -179,12 +195,23 @@ void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, ui
   }
   uint8_t *read_bytes = *bytes;
 
+  scalar_t mod_range = scalar_new();
+  
   scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.C, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+
   scalar_from_bytes(zkp->proof.z_1, &read_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_1, mod_range);
+
   scalar_from_bytes(zkp->proof.z_2, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+
   scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_3, mod_range);
+
+  scalar_free(mod_range);
   
   assert(read_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;

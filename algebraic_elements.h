@@ -11,7 +11,7 @@
  * 
  *  Usage:
  *  All three types (ec_group_t, gr_elem_t, scalar_t) have constructures/destructures <...>_new and <...>_free. Freeing NULL doesn't do anything.
- *  All scalars (especially in modulus ring) are returned as non-negative, aside from the functions scalar_negate and scalar_make_plus_minus.
+ *  All scalars (especially in modulus ring) are returned as non-negative, aside from the functions scalar_negate and scalar_make_signed.
  *  In <...>_to_bytes functions, if byte_len is bigger then needed bytes for element encoding, bytes buffer is padded with zeros. If smaller, nothing is changed.
  * 
  */
@@ -52,7 +52,8 @@ void      scalar_inv               (scalar_t result, const scalar_t num, const s
 // Computes base^exp (mod modulus), supports exp negative coprime to modulus (fails if not coprime). 
 void      scalar_exp               (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus);
 // Convert num (after modulus) from range  [0 ... modulus) to [-modulus/2 ... modulus/2)
-void      scalar_make_plus_minus   (scalar_t num, const scalar_t modulus);
+void      scalar_make_signed        (scalar_t num, const scalar_t modulus);
+void      scalar_make_unsigned      (scalar_t num, const scalar_t modulus);
 
 ec_group_t  ec_group_new        ();
 void        ec_group_free       (ec_group_t ec);

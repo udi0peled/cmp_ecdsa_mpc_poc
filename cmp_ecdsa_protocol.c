@@ -578,7 +578,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   
   // Set party's values, and update sid_hash to include srid and public_X
   scalar_copy(party->secret_x, kgd->secret_x);
-  //scalar_make_plus_minus(party->secret_x, party->ec_order);
+  //scalar_make_signed(party->secret_x, party->ec_order);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     group_elem_copy(party->public_X[j], kgd->payload[j]->public_X);
@@ -1482,6 +1482,9 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->K, 1);
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->G, 1);
 
+  printf("K [%d]\n", BN_num_bits(preda->K));
+  printf("G [%d]\n", BN_num_bits(preda->G));
+
   uint8_t *curr_send_pos_j = curr_send;
 
   zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
@@ -1492,16 +1495,21 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
 
     curr_send = curr_send_pos_j;
     zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytelen, preda->psi_enc_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+    printf("psi_enc_j = "); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
 
     curr_send -= psi_enc_bytelen;
     zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+    printf("zkp_enc_temp = "); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
     
-    printf("A %d [%d]\n", scalar_equal(zkp_enc_temp->proof.A,     preda->psi_enc_j[j]->proof.A), BN_num_bits(preda->psi_enc_j[j]->proof.A));
-    printf("C %d [%d]\n", scalar_equal(zkp_enc_temp->proof.C,     preda->psi_enc_j[j]->proof.C), BN_num_bits(preda->psi_enc_j[j]->proof.C));
-    printf("S %d [%d]\n", scalar_equal(zkp_enc_temp->proof.S,     preda->psi_enc_j[j]->proof.S), BN_num_bits(preda->psi_enc_j[j]->proof.S));
-    printf("z_1 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_1, preda->psi_enc_j[j]->proof.z_1), BN_num_bits(preda->psi_enc_j[j]->proof.z_1));
-    printf("z_2 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_2, preda->psi_enc_j[j]->proof.z_2), BN_num_bits(preda->psi_enc_j[j]->proof.z_2));
-    printf("z_3 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_3, preda->psi_enc_j[j]->proof.z_3), BN_num_bits(preda->psi_enc_j[j]->proof.z_3));
+    printf("A %d [%d, %d]\n",   scalar_equal(zkp_enc_temp->proof.A,   preda->psi_enc_j[j]->proof.A),   BN_num_bits(zkp_enc_temp->proof.A), BN_num_bits(preda->psi_enc_j[j]->proof.A));
+    printf("C %d [%d, %d]\n",   scalar_equal(zkp_enc_temp->proof.C,   preda->psi_enc_j[j]->proof.C),   BN_num_bits(zkp_enc_temp->proof.C), BN_num_bits(preda->psi_enc_j[j]->proof.C));
+    printf("S %d [%d, %d]\n",   scalar_equal(zkp_enc_temp->proof.S,   preda->psi_enc_j[j]->proof.S),   BN_num_bits(zkp_enc_temp->proof.S), BN_num_bits(preda->psi_enc_j[j]->proof.S));
+    printf("z_1 %d [%d, %d]\n", scalar_equal(zkp_enc_temp->proof.z_1, preda->psi_enc_j[j]->proof.z_1), BN_num_bits(zkp_enc_temp->proof.z_1), BN_num_bits(preda->psi_enc_j[j]->proof.z_1));
+    printf("z_2 %d [%d, %d]\n", scalar_equal(zkp_enc_temp->proof.z_2, preda->psi_enc_j[j]->proof.z_2), BN_num_bits(zkp_enc_temp->proof.z_2), BN_num_bits(preda->psi_enc_j[j]->proof.z_2));
+    printf("z_3 %d [%d, %d]\n", scalar_equal(zkp_enc_temp->proof.z_3, preda->psi_enc_j[j]->proof.z_3), BN_num_bits(zkp_enc_temp->proof.z_3), BN_num_bits(preda->psi_enc_j[j]->proof.z_3));
+    printBIGNUM("z_1 temp = ", zkp_enc_temp->proof.z_1, "\n"); printBIGNUM("z_1 real = ", preda->psi_enc_j[j]->proof.z_1, "\n");
+    printBIGNUM("z_2 temp = ", zkp_enc_temp->proof.z_2, "\n"); printBIGNUM("z_2 real = ", preda->psi_enc_j[j]->proof.z_2, "\n");
+    printBIGNUM("z_3 temp = ", zkp_enc_temp->proof.z_3, "\n"); printBIGNUM("z_3 real = ", preda->psi_enc_j[j]->proof.z_3, "\n");
     
     zkp_enc_temp->public.paillier_pub = party->paillier_pub[party->index];
     zkp_enc_temp->public.rped_pub = party->rped_pub[j];
@@ -1511,8 +1519,7 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
     zkp_enc_temp->secret.k = preda->k;
     zkp_enc_temp->secret.rho = preda->rho;
     printf("%d\n", zkp_encryption_in_range_verify(zkp_enc_temp, aux));
-    printf("psi_enc_%lue%lu = ", j, party->index); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
-
+    
     assert(curr_send == send_bytes + send_bytes_len);
 
     cmp_comm_send_bytes(party->index, j, 31, send_bytes, send_bytes_len);
@@ -1641,7 +1648,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     // Create ZKP Paillier homomorphic operation against Paillier commitment
 
     scalar_sample_in_range(preda->beta_j[j], beta_range, 0);
-    scalar_make_plus_minus(preda->beta_j[j], beta_range);
+    scalar_make_signed(preda->beta_j[j], beta_range);
     paillier_encryption_sample(r, party->paillier_pub[party->index]);
     paillier_encryption_encrypt(preda->F_j[j], preda->beta_j[j], r, party->paillier_pub[party->index]);
 
@@ -1670,7 +1677,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     // Create ZKP Paillier homomorphic operation against Group commitment
 
     scalar_sample_in_range(preda->betahat_j[j], beta_range, 0);
-    scalar_make_plus_minus(preda->betahat_j[j], beta_range);
+    scalar_make_signed(preda->betahat_j[j], beta_range);
     paillier_encryption_sample(r, party->paillier_pub[party->index]);
     paillier_encryption_encrypt(preda->Fhat_j[j], preda->betahat_j[j], r, party->paillier_pub[party->index]);
 
@@ -1912,13 +1919,13 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
     
     // Compute delta_i
     paillier_encryption_decrypt(alpha_j, preda->payload[j]->D, party->paillier_priv);
-    scalar_make_plus_minus(alpha_j, party->paillier_pub[party->index]->N);
+    scalar_make_signed(alpha_j, party->paillier_pub[party->index]->N);
     scalar_add(preda->delta, preda->delta, alpha_j, party->ec_order);
     scalar_sub(preda->delta, preda->delta, preda->beta_j[j], party->ec_order);
 
     // Compute chi_i
     paillier_encryption_decrypt(alpha_j, preda->payload[j]->Dhat, party->paillier_priv);
-    scalar_make_plus_minus(alpha_j, party->paillier_pub[party->index]->N);
+    scalar_make_signed(alpha_j, party->paillier_pub[party->index]->N);
     scalar_add(preda->chi, preda->chi, alpha_j, party->ec_order);
     scalar_sub(preda->chi, preda->chi, preda->betahat_j[j], party->ec_order);
 

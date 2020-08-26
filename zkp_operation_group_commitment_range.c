@@ -76,7 +76,7 @@ void zkp_operation_group_commitment_range_challenge (scalar_t e, zkp_operation_g
   assert(fs_data + fs_data_len == data_pos);
 
   fiat_shamir_scalars_in_range(&e, 1, ec_group_order(zkp->public.G), fs_data, fs_data_len);
-  scalar_make_plus_minus(e, ec_group_order(zkp->public.G));
+  scalar_make_signed(e, ec_group_order(zkp->public.G));
 
   free(fs_data);
 }
@@ -107,25 +107,25 @@ void zkp_operation_group_commitment_range_prove (zkp_operation_group_commitment_
 
   BN_set_bit(alpha_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(alpha, alpha_range, 0);
-  scalar_make_plus_minus(alpha, alpha_range);
+  scalar_make_signed(alpha, alpha_range);
 
   BN_set_bit(beta_range, 8*zkp->public.y_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   scalar_sample_in_range(beta, beta_range, 0);
-  scalar_make_plus_minus(beta, beta_range);
+  scalar_make_signed(beta, beta_range);
 
   BN_set_bit(gamma_range, 8*zkp->public.x_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES);
   BN_mul(gamma_range, gamma_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(gamma, gamma_range, 0);
-  scalar_make_plus_minus(gamma, gamma_range);
+  scalar_make_signed(gamma, gamma_range);
   scalar_sample_in_range(delta, gamma_range, 0);
-  scalar_make_plus_minus(delta, gamma_range);
+  scalar_make_signed(delta, gamma_range);
   
   BN_set_bit(mu_range, 8*zkp->public.x_range_bytes);
   BN_mul(mu_range, mu_range, zkp->public.rped_pub->N, bn_ctx);
   scalar_sample_in_range(mu, mu_range, 0);
-  scalar_make_plus_minus(mu, mu_range);
+  scalar_make_signed(mu, mu_range);
   scalar_sample_in_range(m, mu_range, 0);
-  scalar_make_plus_minus(m, mu_range);
+  scalar_make_signed(m, mu_range);
   
   group_operation(zkp->proof.B_x, NULL, zkp->public.g, alpha, zkp->public.G);
 
@@ -247,6 +247,9 @@ void zkp_operation_group_commitment_range_proof_to_bytes(uint8_t **bytes, uint64
     return ;
   }
   uint8_t *set_bytes = *bytes;
+
+  scalar_t mod_range       = scalar_new();
+  scalar_t unsigned_scalar = scalar_new();
  
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
   group_elem_to_bytes(&set_bytes, GROUP_ELEMENT_BYTES, zkp->proof.B_x, zkp->public.G, 1);
@@ -255,12 +258,32 @@ void zkp_operation_group_commitment_range_proof_to_bytes(uint8_t **bytes, uint64
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.F, 1);
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.S, 1);
   scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES, zkp->proof.T, 1);
-  scalar_to_bytes(&set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_1, 1);
-  scalar_to_bytes(&set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_2, 1);
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_3, 1);
-  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, zkp->proof.z_4, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_1);
+  scalar_set_power_of_2(mod_range, 8*(x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_2);
+  scalar_set_power_of_2(mod_range, 8*(y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_3);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
+
+  scalar_copy(unsigned_scalar, zkp->proof.z_4);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_unsigned(unsigned_scalar, mod_range);
+  scalar_to_bytes(&set_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, unsigned_scalar, 1);
+
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w, 1);
   scalar_to_bytes(&set_bytes, PAILLIER_MODULUS_BYTES, zkp->proof.w_y, 1);
+
+  scalar_free(mod_range);
+  scalar_free(unsigned_scalar);
 
   assert(set_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;
@@ -280,6 +303,8 @@ void zkp_operation_group_commitment_range_proof_from_bytes(zkp_operation_group_c
   }
   uint8_t *read_bytes = *bytes;
 
+  scalar_t mod_range = scalar_new();
+
   scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
   group_elem_from_bytes(zkp->proof.B_x, &read_bytes, GROUP_ELEMENT_BYTES, zkp->public.G, 1);
   scalar_from_bytes(zkp->proof.B_y, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
@@ -287,12 +312,27 @@ void zkp_operation_group_commitment_range_proof_from_bytes(zkp_operation_group_c
   scalar_from_bytes(zkp->proof.F, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.T, &read_bytes, RING_PED_MODULUS_BYTES, 1);
+  
   scalar_from_bytes(zkp->proof.z_1, &read_bytes, x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_1, mod_range);
+
   scalar_from_bytes(zkp->proof.z_2, &read_bytes, y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(y_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_2, mod_range);
+
   scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_3, mod_range);
+
   scalar_from_bytes(zkp->proof.z_4, &read_bytes, RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_4, mod_range);
+
   scalar_from_bytes(zkp->proof.w, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.w_y, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+
+  scalar_free(mod_range);
 
   assert(read_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;

@@ -26,7 +26,7 @@ void test_scalars(const scalar_t range, uint64_t range_byte_len)
   scalar_to_bytes(&alpha_bytes, range_byte_len, alpha, 0);
   printHexBytes("alpha_bytes = 0x", alpha_bytes, range_byte_len, "\n", 1);
 
-  scalar_make_plus_minus(alpha, range);
+  scalar_make_signed(alpha, range);
   printBIGNUM("alpha_s = ", alpha, "\n");
   
   scalar_exp(gamma, beta, alpha, range);
@@ -193,7 +193,7 @@ void test_ring_pedersen(const scalar_t p, const scalar_t q)
   scalar_t rped_com = scalar_new();
   
   scalar_sample_in_range(s_exp, rped_pub->N, 0);
-  // scalar_make_plus_minus(s_exp, rped_pub->N);
+  // scalar_make_signed(s_exp, rped_pub->N);
   printBIGNUM("s_exp = ", (s_exp), "\n");
 
   scalar_sample_in_range(t_exp, rped_pub->N, 0);
@@ -492,12 +492,69 @@ void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
   group_elem_free(pubkey);
 }
 
+void debug_zkp()
+{ 
+  uint64_t k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
+
+  // Set ZKP with random scalars
+
+  zkp_encryption_in_range_t *zkp_enc_orig = zkp_encryption_in_range_new();
+  zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
+
+  scalar_t modA  = scalar_new();
+  scalar_t modC  = scalar_new();
+  scalar_t modS  = scalar_new();
+  scalar_t modz1 = scalar_new();
+  scalar_t modz2 = scalar_new();
+  scalar_t modz3 = scalar_new();
+
+  scalar_set_power_of_2(modA,  8 * 2 * PAILLIER_MODULUS_BYTES);
+  scalar_set_power_of_2(modC,  8 * RING_PED_MODULUS_BYTES);
+  scalar_set_power_of_2(modS,  8 * RING_PED_MODULUS_BYTES);
+  scalar_set_power_of_2(modz1, 8 * (k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_set_power_of_2(modz2, 8 * PAILLIER_MODULUS_BYTES);
+  scalar_set_power_of_2(modz3, 8 * (RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+
+  scalar_sample_in_range(zkp_enc_orig->proof.A, modA, 0);
+  scalar_sample_in_range(zkp_enc_orig->proof.C, modC, 0);
+  scalar_sample_in_range(zkp_enc_orig->proof.S, modS, 0);
+  scalar_sample_in_range(zkp_enc_orig->proof.z_1, modz1, 0);
+  scalar_sample_in_range(zkp_enc_orig->proof.z_2, modz2, 0);
+  scalar_sample_in_range(zkp_enc_orig->proof.z_3, modz3, 0);
+
+  // Encode & Decode ZKP
+  uint64_t psi_enc_bytelen;
+  zkp_encryption_in_range_proof_to_bytes(NULL, &psi_enc_bytelen, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
+
+  uint64_t send_bytes_len =  psi_enc_bytelen;
+  uint8_t *send_bytes = malloc(send_bytes_len);
+  uint8_t *curr_send = send_bytes;
+
+  zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytelen, zkp_enc_orig, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+  printHexBytes("zkp_enc_orig = 0x", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
+
+  curr_send -= psi_enc_bytelen;
+  zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+  
+  printf("A %d [%d]\n", scalar_equal(zkp_enc_temp->proof.A,     zkp_enc_orig->proof.A), BN_num_bits(zkp_enc_orig->proof.A));
+  printf("C %d [%d]\n", scalar_equal(zkp_enc_temp->proof.C,     zkp_enc_orig->proof.C), BN_num_bits(zkp_enc_orig->proof.C));
+  printf("S %d [%d]\n", scalar_equal(zkp_enc_temp->proof.S,     zkp_enc_orig->proof.S), BN_num_bits(zkp_enc_orig->proof.S));
+  printf("z_1 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_1, zkp_enc_orig->proof.z_1), BN_num_bits(zkp_enc_orig->proof.z_1));
+  printf("z_2 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_2, zkp_enc_orig->proof.z_2), BN_num_bits(zkp_enc_orig->proof.z_2));
+  printf("z_3 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_3, zkp_enc_orig->proof.z_3), BN_num_bits(zkp_enc_orig->proof.z_3));  
+
+  printHexBytes("zkp_enc_temp = 0x", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
+}
+
 int PRINT_SECRETS;
 
 void test_protocol(uint64_t party_index, uint64_t num_parties, int print_secrets)
 {
-  PRINT_SECRETS = print_secrets;
+  debug_zkp();
 
+  //return;
+  PRINT_SECRETS = print_secrets;
+  
   hash_chunk  sid = "Fireblocks";
   uint64_t    *party_ids = calloc(num_parties, sizeof(uint64_t));
   //cmp_party_t **parties = calloc(num_parties, sizeof(cmp_party_t*));
