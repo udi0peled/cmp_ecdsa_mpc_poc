@@ -578,7 +578,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   
   // Set party's values, and update sid_hash to include srid and public_X
   scalar_copy(party->secret_x, kgd->secret_x);
-  //scalar_make_plus_minus(party->secret_x, party->ec_order);
+  //scalar_make_signed(party->secret_x, party->ec_order);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     group_elem_copy(party->public_X[j], kgd->payload[j]->public_X);
@@ -1484,7 +1484,7 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
 
   uint8_t *curr_send_pos_j = curr_send;
 
-  zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
+  // zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1493,31 +1493,33 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
     curr_send = curr_send_pos_j;
     zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytelen, preda->psi_enc_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
 
-    curr_send -= psi_enc_bytelen;
-    zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+    // curr_send -= psi_enc_bytelen;
+    // zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
     
-    printf("A %d [%d]\n", scalar_equal(zkp_enc_temp->proof.A,     preda->psi_enc_j[j]->proof.A), BN_num_bits(preda->psi_enc_j[j]->proof.A));
-    printf("C %d [%d]\n", scalar_equal(zkp_enc_temp->proof.C,     preda->psi_enc_j[j]->proof.C), BN_num_bits(preda->psi_enc_j[j]->proof.C));
-    printf("S %d [%d]\n", scalar_equal(zkp_enc_temp->proof.S,     preda->psi_enc_j[j]->proof.S), BN_num_bits(preda->psi_enc_j[j]->proof.S));
-    printf("z_1 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_1, preda->psi_enc_j[j]->proof.z_1), BN_num_bits(preda->psi_enc_j[j]->proof.z_1));
-    printf("z_2 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_2, preda->psi_enc_j[j]->proof.z_2), BN_num_bits(preda->psi_enc_j[j]->proof.z_2));
-    printf("z_3 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_3, preda->psi_enc_j[j]->proof.z_3), BN_num_bits(preda->psi_enc_j[j]->proof.z_3));
+    // printf("A %d [%d]\n", scalar_equal(zkp_enc_temp->proof.A,     preda->psi_enc_j[j]->proof.A), BN_num_bits(preda->psi_enc_j[j]->proof.A));
+    // printf("C %d [%d]\n", scalar_equal(zkp_enc_temp->proof.C,     preda->psi_enc_j[j]->proof.C), BN_num_bits(preda->psi_enc_j[j]->proof.C));
+    // printf("S %d [%d]\n", scalar_equal(zkp_enc_temp->proof.S,     preda->psi_enc_j[j]->proof.S), BN_num_bits(preda->psi_enc_j[j]->proof.S));
+    // printf("z_1 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_1, preda->psi_enc_j[j]->proof.z_1), BN_num_bits(preda->psi_enc_j[j]->proof.z_1));
+    // printf("z_2 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_2, preda->psi_enc_j[j]->proof.z_2), BN_num_bits(preda->psi_enc_j[j]->proof.z_2));
+    // printf("z_3 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_3, preda->psi_enc_j[j]->proof.z_3), BN_num_bits(preda->psi_enc_j[j]->proof.z_3));
     
-    zkp_enc_temp->public.paillier_pub = party->paillier_pub[party->index];
-    zkp_enc_temp->public.rped_pub = party->rped_pub[j];
-    zkp_enc_temp->public.G = party->ec;
-    zkp_enc_temp->public.K = preda->K;
-    zkp_enc_temp->public.k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
-    zkp_enc_temp->secret.k = preda->k;
-    zkp_enc_temp->secret.rho = preda->rho;
-    printf("%d\n", zkp_encryption_in_range_verify(zkp_enc_temp, aux));
-    printf("psi_enc_%lue%lu = ", j, party->index); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
+    // zkp_enc_temp->public.paillier_pub = party->paillier_pub[party->index];
+    // zkp_enc_temp->public.rped_pub = party->rped_pub[j];
+    // zkp_enc_temp->public.G = party->ec;
+    // zkp_enc_temp->public.K = preda->K;
+    // zkp_enc_temp->public.k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
+    // zkp_enc_temp->secret.k = preda->k;
+    // zkp_enc_temp->secret.rho = preda->rho;
+    // printf("%d\n", zkp_encryption_in_range_verify(zkp_enc_temp, aux));
+    // printf("psi_enc_%lue%lu = ", j, party->index); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
 
     assert(curr_send == send_bytes + send_bytes_len);
 
     cmp_comm_send_bytes(party->index, j, 31, send_bytes, send_bytes_len);
   }
   free(send_bytes);
+  zkp_aux_info_free(aux);
+  // zkp_encryption_in_range_free(zkp_enc_temp);
 
   // Print
 
@@ -1615,7 +1617,6 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     if (j == party->index) continue;
 
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
-    printHexBytes("aux = 0x", aux->info, aux->info_len, "\n", 1);
     verified_psi_enc[j] = zkp_encryption_in_range_verify(preda->payload[j]->psi_enc, aux);
 
     if (verified_psi_enc[j] != 1)  printf("%sParty %lu: failed verification of psi_enc from Party %lu\n",ERR_STR, party->index, j);
@@ -1633,6 +1634,11 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
   scalar_t temp_enc   = scalar_new();
   scalar_t beta_range = scalar_new();
 
+  uint64_t bytelen;
+  zkp_operation_paillier_commitment_range_proof_to_bytes(NULL, &bytelen, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
+  uint8_t *bytes = malloc(bytelen);
+  zkp_operation_paillier_commitment_range_t *psi_affp_temp = zkp_operation_paillier_commitment_range_new();
+
   scalar_set_power_of_2(beta_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1641,7 +1647,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     // Create ZKP Paillier homomorphic operation against Paillier commitment
 
     scalar_sample_in_range(preda->beta_j[j], beta_range, 0);
-    scalar_make_plus_minus(preda->beta_j[j], beta_range);
+    scalar_make_signed(preda->beta_j[j], beta_range);
     paillier_encryption_sample(r, party->paillier_pub[party->index]);
     paillier_encryption_encrypt(preda->F_j[j], preda->beta_j[j], r, party->paillier_pub[party->index]);
 
@@ -1665,12 +1671,28 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     preda->psi_affp_j[j]->secret.rho_x = preda->nu;
     preda->psi_affp_j[j]->secret.rho_y = r;
     preda->psi_affp_j[j]->secret.rho = s;
+    printHexBytes("psi_affp_j aux = 0x", aux->info, aux->info_len, "\n", 1);
     zkp_operation_paillier_commitment_range_prove(preda->psi_affp_j[j], aux);
+
+    // zkp_operation_paillier_commitment_range_proof_to_bytes(&bytes, &bytelen, preda->psi_affp_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
+    // zkp_operation_paillier_commitment_range_proof_from_bytes(psi_affp_temp, &bytes, &bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
+    
+    // psi_affp_temp->public.paillier_pub_0 = preda->psi_affp_j[j]->public.paillier_pub_0;
+    // psi_affp_temp->public.paillier_pub_1 = preda->psi_affp_j[j]->public.paillier_pub_1;
+    // psi_affp_temp->public.rped_pub = preda->psi_affp_j[j]->public.rped_pub;
+    // psi_affp_temp->public.C = preda->psi_affp_j[j]->public.C;
+    // psi_affp_temp->public.G = preda->psi_affp_j[j]->public.G;
+    // psi_affp_temp->public.D = preda->psi_affp_j[j]->public.D;
+    // psi_affp_temp->public.X = preda->psi_affp_j[j]->public.X;
+    // psi_affp_temp->public.Y = preda->psi_affp_j[j]->public.Y;
+    // psi_affp_temp->public.x_range_bytes = preda->psi_affp_j[j]->public.x_range_bytes;
+    // psi_affp_temp->public.y_range_bytes = preda->psi_affp_j[j]->public.y_range_bytes;
+    // printf("\n# psi_affp_temp[%lu] verified? %d\n", j, zkp_operation_paillier_commitment_range_verify(psi_affp_temp, aux));
 
     // Create ZKP Paillier homomorphic operation against Group commitment
 
     scalar_sample_in_range(preda->betahat_j[j], beta_range, 0);
-    scalar_make_plus_minus(preda->betahat_j[j], beta_range);
+    scalar_make_signed(preda->betahat_j[j], beta_range);
     paillier_encryption_sample(r, party->paillier_pub[party->index]);
     paillier_encryption_encrypt(preda->Fhat_j[j], preda->betahat_j[j], r, party->paillier_pub[party->index]);
 
@@ -1822,7 +1844,7 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
     preda->payload[j]->psi_affp->public.C = preda->K;
     preda->payload[j]->psi_affp->public.G = party->ec;
     preda->payload[j]->psi_affp->public.D = preda->payload[j]->D;
-    preda->payload[j]->psi_affp->public.X = preda->G;
+    preda->payload[j]->psi_affp->public.X = preda->payload[j]->G;
     preda->payload[j]->psi_affp->public.Y = preda->payload[j]->F;
     preda->payload[j]->psi_affp->public.x_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
     preda->payload[j]->psi_affp->public.y_range_bytes = CALIGRAPHIC_J_ZKP_RANGE_BYTES;
@@ -1830,7 +1852,7 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
 
     preda->payload[j]->psi_affg->public.paillier_pub_0 = party->paillier_pub[party->index];
     preda->payload[j]->psi_affg->public.paillier_pub_1 = party->paillier_pub[j];
-    preda->payload[j]->psi_affg->public.rped_pub = party->rped_pub[j];
+    preda->payload[j]->psi_affg->public.rped_pub = party->rped_pub[party->index];
     preda->payload[j]->psi_affg->public.G = party->ec;
     preda->payload[j]->psi_affg->public.g = party->ec_gen;
     preda->payload[j]->psi_affg->public.C = preda->K;
@@ -1878,6 +1900,7 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
 
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
 
+    printHexBytes("psi_affp_j aux = 0x", aux->info, aux->info_len, "\n", 1);
     verified_psi_affp[j] = zkp_operation_paillier_commitment_range_verify(preda->payload[j]->psi_affp, aux);
     verified_psi_affg[j] = zkp_operation_group_commitment_range_verify(preda->payload[j]->psi_affg, aux);
     verified_psi_logG[j] = zkp_group_vs_paillier_range_verify(preda->payload[j]->psi_logG, aux);
@@ -1912,13 +1935,13 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
     
     // Compute delta_i
     paillier_encryption_decrypt(alpha_j, preda->payload[j]->D, party->paillier_priv);
-    scalar_make_plus_minus(alpha_j, party->paillier_pub[party->index]->N);
+    scalar_make_signed(alpha_j, party->paillier_pub[party->index]->N);
     scalar_add(preda->delta, preda->delta, alpha_j, party->ec_order);
     scalar_sub(preda->delta, preda->delta, preda->beta_j[j], party->ec_order);
 
     // Compute chi_i
     paillier_encryption_decrypt(alpha_j, preda->payload[j]->Dhat, party->paillier_priv);
-    scalar_make_plus_minus(alpha_j, party->paillier_pub[party->index]->N);
+    scalar_make_signed(alpha_j, party->paillier_pub[party->index]->N);
     scalar_add(preda->chi, preda->chi, alpha_j, party->ec_order);
     scalar_sub(preda->chi, preda->chi, preda->betahat_j[j], party->ec_order);
 
@@ -2008,9 +2031,9 @@ void  cmp_presign_final_exec (cmp_party_t *party)
     preda->payload[j]->psi_logK->public.paillier_pub = party->paillier_pub[j];
     preda->payload[j]->psi_logK->public.rped_pub = party->rped_pub[party->index];
     preda->payload[j]->psi_logK->public.G = party->ec;
-    preda->payload[j]->psi_logK->public.g = party->ec_gen;
-    preda->payload[j]->psi_logK->public.X = preda->payload[j]->Gamma;
-    preda->payload[j]->psi_logK->public.C = preda->payload[j]->G;
+    preda->payload[j]->psi_logK->public.g = preda->combined_Gamma;
+    preda->payload[j]->psi_logK->public.X = preda->payload[j]->Delta;
+    preda->payload[j]->psi_logK->public.C = preda->payload[j]->K;
     preda->payload[j]->psi_logK->public.x_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
     zkp_group_vs_paillier_range_proof_from_bytes(preda->payload[j]->psi_logK, &curr_recv, &psi_logK_bytes, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
 

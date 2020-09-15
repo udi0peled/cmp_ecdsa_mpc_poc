@@ -1,5 +1,6 @@
 #include "algebraic_elements.h"
 #include <openssl/rand.h>
+#include <assert.h>
 
 scalar_t  scalar_new    ()                                  { return BN_secure_new(); }
 void      scalar_free   (scalar_t num)                      { BN_clear_free(num); }
@@ -92,18 +93,36 @@ int scalar_bitlength (const scalar_t a)
   return BN_num_bits(a);
 }
 
-void scalar_make_plus_minus(scalar_t num, const scalar_t modulus)
+void scalar_make_signed(scalar_t num, const scalar_t range)
 {
+  assert((BN_cmp(num, range) <= 0) && (BN_is_negative(num) == 0));
+
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   
-  scalar_t half_range = BN_dup(modulus);
+  scalar_t half_range = BN_dup(range);
   BN_div_word(half_range, 2);
-  BN_mod(num, num, modulus, bn_ctx);
-  if (BN_cmp(num, half_range) >= 0) BN_sub(num, num, modulus);
+
+  if (BN_cmp(num, half_range) >= 0) BN_sub(num, num, range);
   
   scalar_free(half_range);
   BN_CTX_free(bn_ctx);
 }
+
+void scalar_make_unsigned(scalar_t num, const scalar_t range)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+
+  scalar_t half_range = BN_dup(range);
+  BN_div_word(half_range, 2);
+
+  if (BN_is_negative(num)) BN_add(num, num, range);
+
+  assert((BN_cmp(num, range) <= 0) && (BN_is_negative(num) == 0));
+  
+  scalar_free(half_range);
+  BN_CTX_free(bn_ctx);
+}
+
 
 void scalar_sample_in_range(scalar_t rnd, const scalar_t range_mod, int coprime)
 {

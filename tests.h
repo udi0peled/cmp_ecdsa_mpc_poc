@@ -26,7 +26,7 @@ void test_fiat_shamir();
 void test_scalars(const scalar_t range, uint64_t range_byte_len);
 void test_group_elements();
 void test_zkp_schnorr();
-void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub);
+void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub, uint64_t k_range_bytes);
 
 void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values);
 

@@ -247,6 +247,20 @@ int main(int argc, char* argv[])
     }
     else if (strcmp(argv[1], "zkp") == 0)
     {
+      paillier_private_key_t *paillier_priv = paillier_encryption_private_new();
+      paillier_public_key_t  *paillier_pub = paillier_encryption_public_new();
+      ring_pedersen_private_t *rped_priv = ring_pedersen_private_new();
+      ring_pedersen_public_t  *rped_pub = ring_pedersen_public_new();
+
+      paillier_encryption_generate_private(paillier_priv, 4 * PAILLIER_MODULUS_BYTES);
+      paillier_encryption_copy_keys(NULL, paillier_pub, paillier_priv, NULL);
+      ring_pedersen_generate_private(rped_priv, 4 * RING_PED_MODULUS_BYTES);
+      ring_pedersen_copy_param(NULL, rped_pub, rped_priv, NULL);
+
+      test_zkp_encryption_in_range(paillier_pub, rped_pub, CALIGRAPHIC_I_ZKP_RANGE_BYTES);
+    
+      paillier_encryption_free_keys(paillier_priv, paillier_pub);
+      ring_pedersen_free_param(rped_priv, rped_pub);
     }
     else if (strcmp(argv[1], "write") == 0)
     {
@@ -268,7 +282,6 @@ int main(int argc, char* argv[])
 
       return 0;
     }
-    
   }
 
 USAGE:
