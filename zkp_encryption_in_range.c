@@ -189,7 +189,8 @@ void zkp_encryption_in_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_len,
 
 void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t k_range_bytes, int move_to_end)
 { 
-  uint64_t needed_byte_len = 3*RING_PED_MODULUS_BYTES + 3*PAILLIER_MODULUS_BYTES + 2*k_range_bytes + 2*EPS_ZKP_SLACK_PARAMETER_BYTES;
+  uint64_t needed_byte_len;
+  zkp_encryption_in_range_proof_to_bytes(NULL, &needed_byte_len, NULL, k_range_bytes, 0);
 
   if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
   {
@@ -198,13 +199,19 @@ void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, ui
   }
   uint8_t *read_bytes = *bytes;
 
+<<<<<<< HEAD
   uint64_t bytelen;
   scalar_t range = scalar_new();
 
+=======
+  scalar_t mod_range = scalar_new();
+  
+>>>>>>> 1380238acf1e189a91b3aa9fe5002defa1f48b4c
   scalar_from_bytes(zkp->proof.S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
   scalar_from_bytes(zkp->proof.C, &read_bytes, RING_PED_MODULUS_BYTES, 1);
 
+<<<<<<< HEAD
   // Signed z_1 from unsigned bytes
   bytelen = k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES;
   scalar_set_power_of_2(range, 8*bytelen);
@@ -220,6 +227,19 @@ void zkp_encryption_in_range_proof_from_bytes(zkp_encryption_in_range_t *zkp, ui
   scalar_make_signed(zkp->proof.z_3, range);
   
   scalar_free(range);
+=======
+  scalar_from_bytes(zkp->proof.z_1, &read_bytes, k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_1, mod_range);
+
+  scalar_from_bytes(zkp->proof.z_2, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+
+  scalar_from_bytes(zkp->proof.z_3, &read_bytes, RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES, 1);
+  scalar_set_power_of_2(mod_range, 8*(RING_PED_MODULUS_BYTES + k_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES));
+  scalar_make_signed(zkp->proof.z_3, mod_range);
+
+  scalar_free(mod_range);
+>>>>>>> 1380238acf1e189a91b3aa9fe5002defa1f48b4c
   
   assert(read_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;

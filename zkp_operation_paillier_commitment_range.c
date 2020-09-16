@@ -255,6 +255,9 @@ void zkp_operation_paillier_commitment_range_proof_to_bytes(uint8_t **bytes, uin
   scalar_t range = scalar_new();
   scalar_t unsigned_value = scalar_new();
  
+  scalar_t mod_range = scalar_new();
+  scalar_t unsigned_scalar = scalar_new();
+
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.B_x, 1);
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.B_y, 1);
@@ -305,7 +308,8 @@ void zkp_operation_paillier_commitment_range_proof_to_bytes(uint8_t **bytes, uin
 
 void zkp_operation_paillier_commitment_range_proof_from_bytes(zkp_operation_paillier_commitment_range_t *zkp, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end)
 {
-  uint64_t needed_byte_len = 6*RING_PED_MODULUS_BYTES + 9*PAILLIER_MODULUS_BYTES + 3*x_range_bytes + y_range_bytes + 4*EPS_ZKP_SLACK_PARAMETER_BYTES;
+  uint64_t needed_byte_len;
+  zkp_operation_paillier_commitment_range_proof_to_bytes(NULL, &needed_byte_len, NULL, x_range_bytes, y_range_bytes, 0);
 
   if ((!bytes) || (!*bytes) || (!zkp) || (needed_byte_len > *byte_len))
   {

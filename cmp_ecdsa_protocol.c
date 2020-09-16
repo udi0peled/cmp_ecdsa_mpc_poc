@@ -1482,6 +1482,9 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->K, 1);
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->G, 1);
 
+  printf("K [%d]\n", BN_num_bits(preda->K));
+  printf("G [%d]\n", BN_num_bits(preda->G));
+
   uint8_t *curr_send_pos_j = curr_send;
 
   // zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
@@ -1492,6 +1495,7 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
 
     curr_send = curr_send_pos_j;
     zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytelen, preda->psi_enc_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+    printf("psi_enc_j = "); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
 
     // curr_send -= psi_enc_bytelen;
     // zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
