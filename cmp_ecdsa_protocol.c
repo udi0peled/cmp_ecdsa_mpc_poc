@@ -9,6 +9,8 @@
 #include <semaphore.h>
 
 #define ERR_STR "\nXXXXX ERROR XXXXX\n\n"
+
+extern int PRINT_VALUES;
 extern int PRINT_SECRETS;
 
 /********************************************
@@ -129,9 +131,6 @@ cmp_party_t *cmp_party_new (uint64_t party_index, uint64_t num_parties, const ui
 {
   cmp_party_t *party = malloc(sizeof(*party));
   
-  //parties[index] = party;
-  //party->parties = parties;
-  
   party->id = parties_ids[party_index];
   party->index = party_index;
   party->num_parties = num_parties;
@@ -153,7 +152,6 @@ cmp_party_t *cmp_party_new (uint64_t party_index, uint64_t num_parties, const ui
   party->chi = scalar_new();
 
   memcpy(party->sid, sid, sizeof(hash_chunk));
-  //memset(party->srid, 0x00, sizeof(hash_chunk));
 
   party->paillier_priv = paillier_encryption_private_new();
   for (uint64_t i = 0; i < num_parties; ++i)
@@ -270,7 +268,7 @@ void cmp_key_generation_round_1_commit(hash_chunk commit_digest, const hash_chun
 
 void  cmp_key_generation_round_1_exec (cmp_party_t *party)
 {
-  printf("### KeyGen Phase, Round 1, Party %lu.\n", party->index);
+  printf("### Round 1.\n");
 
   clock_t time_start = clock();
   uint64_t time_diff;
@@ -311,17 +309,23 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   free(send_bytes);
 
   // Print
+  
+  printf("### Broadcast (V_i).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
 
-  printf("Broadcast (V_i).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
-  printf("V_%lu = ", party->index); printHexBytes("0x", kgd->V, sizeof(hash_chunk), "\n", 0);
+  if (PRINT_VALUES)
+  {
+    printf("V_%lu = ", party->index); printHexBytes("0x", kgd->V, sizeof(hash_chunk), "\n", 0);
 
-  if (!PRINT_SECRETS) return;
-  printf("x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+    if (PRINT_SECRETS)
+    {
+      printf("x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+    }
+  }
 }
 
 void  cmp_key_generation_round_2_exec (cmp_party_t *party)
 {
-  printf("### KeyGen Phase, Round 2. Party %lu.\n", party->index);
+  printf("### Round 2.\n");
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
 
@@ -340,9 +344,6 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
     cmp_void_from_bytes(kgd->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("V_%lu = ", j); printHexBytes("0x", kgd->payload[j]->V, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
 
@@ -384,17 +385,21 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
 
   // Print 
 
-  printf("### Publish (srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
-  printf("X_%lu = ", party->index); printECPOINT("", kgd->public_X, party->ec, "\n", 1);
-  printf("A_%lu = ", party->index); printECPOINT("", kgd->commited_A, party->ec, "\n", 1);
-  printf("srid_%lu = ", party->index); printHexBytes("0x", kgd->srid, sizeof(hash_chunk), "\n", 0);
-  printf("u_%lu = ", party->index); printHexBytes("0x", kgd->u, sizeof(hash_chunk), "\n", 0);
-  printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgd->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+  printf("### Publish (srid_i, X_i, A_i, u_i, echo_broadcast_i).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
+
+  if (PRINT_VALUES)
+  {
+    printf("X_%lu = ", party->index); printECPOINT("", kgd->public_X, party->ec, "\n", 1);
+    printf("A_%lu = ", party->index); printECPOINT("", kgd->commited_A, party->ec, "\n", 1);
+    printf("srid_%lu = ", party->index); printHexBytes("0x", kgd->srid, sizeof(hash_chunk), "\n", 0);
+    printf("u_%lu = ", party->index); printHexBytes("0x", kgd->u, sizeof(hash_chunk), "\n", 0);
+    printf("echo_broadcast_%lu = ", party->index); printHexBytes("0x", kgd->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+  }
 }
 
 void  cmp_key_generation_round_3_exec (cmp_party_t *party)
 {
-  printf("### KeyGen Phase, Round 3, Party %lu.\n", party->index);
+  printf("### Round 3.\n");
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
 
@@ -417,13 +422,6 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
     group_elem_from_bytes(kgd->payload[j]->commited_A, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
     
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("X_%lu = ", j); printECPOINT("", kgd->payload[j]->public_X, party->ec, "\n", 1);
-    printf("A_%lu = ", j); printECPOINT("", kgd->payload[j]->commited_A, party->ec, "\n", 1);
-    printf("srid_%lu = ", j); printHexBytes("0x", kgd->payload[j]->srid, sizeof(hash_chunk), "\n", 0);
-    printf("u_%lu = ", j); printHexBytes("0x", kgd->payload[j]->u, sizeof(hash_chunk), "\n", 0);
-    printf("echo_broadcast_%lu = ", j); printHexBytes("0x", kgd->payload[j]->echo_broadcast, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
 
@@ -500,14 +498,17 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   
   // Print
 
-  printf("### Publish (psi_sch).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
-  printf("# psi_i = ...\n");
-  printHexBytes("combined_srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
+  printf("### Publish (psi_sch).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
+  if (PRINT_VALUES)
+  {
+    printf("# psi_i = ...\n");
+    printHexBytes("combined_srid = 0x", party->srid, sizeof(hash_chunk), "\n", 0);
+  }
 }
 
 void cmp_key_generation_final_exec(cmp_party_t *party)
 {
-  printf("### KeyGen Finalization Round, Party %lu.\n", party->index);
+  printf("### KeyGen Finalization Round.\n");
 
   cmp_key_generation_data_t *kgd = party->key_generation_data;
 
@@ -531,9 +532,6 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
     zkp_schnorr_proof_from_bytes(kgd->payload[j]->psi_sch, &curr_recv, &psi_sch_byte_len, 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("# psi_sch_%lu = ...\n", j);
   }
   free(recv_bytes);
 
@@ -592,7 +590,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
 
   // Print
 
-  printf("### Final. Store (srid, all X, secret x_i).\t>>>\t%lu B, %lu ms\n", 
+  printf("### Store (srid, all X, secret x_i).\t>>> %lu B, %lu ms\n", 
     sizeof(hash_chunk) + GROUP_ORDER_BYTES + party->num_parties * GROUP_ELEMENT_BYTES, time_diff);
 }
 
@@ -737,7 +735,7 @@ void cmp_refresh_round_1_commit(hash_chunk commit_digest, const hash_chunk sid_h
 
 void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
 {
-  printf("### Refresh Phase, Round 1, Party %lu.\n", party->index);
+  printf("### Round 1.\n");
 
   clock_t time_start = clock();
   uint64_t time_diff;
@@ -799,21 +797,26 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
 
   // Print
 
-  printf("### Broadcast (V_i).\t>>>\t%lu B, %lu ms (gen N_i) + %lu ms (rest)\n", send_bytes_len, reda->prime_time, time_diff);;
-  printf("V_%lu = ", party->index); printHexBytes("0x", reda->V, sizeof(hash_chunk), "\n", 0);
-
-  if (!PRINT_SECRETS) return;
-  printf("paillier_p_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->p, "\n");
-  printf("paillier_q_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->q, "\n");
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  printf("### Broadcast (V_i).\t>>> %lu B, %lu ms (gen N_i) + %lu ms (rest)\n", send_bytes_len, reda->prime_time, time_diff);;
+  if (PRINT_VALUES)
   {
-    printf("x_%lue%lu = ", party->index, j); printBIGNUM("", reda->reshare_secret_x_j[j], "\n");
+    printf("V_%lu = ", party->index); printHexBytes("0x", reda->V, sizeof(hash_chunk), "\n", 0);
+
+    if (!PRINT_SECRETS)
+    {
+      printf("paillier_p_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->p, "\n");
+      printf("paillier_q_%lu = ", party->index); printBIGNUM("", reda->paillier_priv->q, "\n");
+      for (uint64_t j = 0; j < party->num_parties; ++j)
+      {
+        printf("x_%lue%lu = ", party->index, j); printBIGNUM("", reda->reshare_secret_x_j[j], "\n");
+      }
+    }
   }
 }
 
 void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
 {
-  printf("### Refresh Phase, Round 1, Party %lu.\n", party->index);
+  printf("### Round 1.\n");
 
   cmp_refresh_data_t *reda = party->refresh_data;
 
@@ -832,9 +835,6 @@ void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
     cmp_void_from_bytes(reda->payload[j]->V, &curr_recv, sizeof(hash_chunk), 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("V_%lu = ", j); printHexBytes("0x", reda->payload[j]->V, sizeof(hash_chunk), "\n", 0);
   }
   free(recv_bytes);
 
@@ -889,25 +889,28 @@ void  cmp_refresh_aux_info_round_2_exec (cmp_party_t *party)
 
   // Print 
 
-  printf("### Publishe (X_i^{1...n}, A_i^{1...n}, Paillier N_i, Pedersen N_i, s_i, t_i, rho_i, u_i, echo_broadcast).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
-  printf("echo_broadcast_%lu = ", party->index); printHexBytes("echo_broadcast = 0x", reda->echo_broadcast, sizeof(hash_chunk), "\n", 0);
-  printf("rho_%lu = ", party->index); printHexBytes("0x", reda->rho, sizeof(hash_chunk), "\n", 0);
-  printf("u_%lu = ", party->index); printHexBytes("0x", reda->u, sizeof(hash_chunk), "\n", 0);
-  printf("paillier_N_%lu = ", party->index); printBIGNUM("", reda->paillier_pub->N, "\n");
-  printf("rped_N_%lu = ", party->index); printBIGNUM("", reda->rped_pub->N, "\n");
-  printf("s_%lu = ", party->index); printBIGNUM("", reda->rped_pub->s, "\n");
-  printf("t_%lu = ", party->index); printBIGNUM("", reda->rped_pub->t, "\n");
-
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  printf("### Publish (X_i^{1...n}, A_i^{1...n}, Paillier N_i, Pedersen N_i, s_i, t_i, rho_i, u_i, echo_broadcast).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
+  if (PRINT_VALUES)
   {
-    printf("X_%lue%lu = ", party->index, j); printECPOINT("", reda->reshare_public_X_j[j], party->ec, "\n", 1);
-    printf("A_%lue%lu = ", party->index, j); printECPOINT("", reda->commited_A_j[j], party->ec, "\n", 1);
+    printf("echo_broadcast_%lu = ", party->index); printHexBytes("echo_broadcast = 0x", reda->echo_broadcast, sizeof(hash_chunk), "\n", 0);
+    printf("rho_%lu = ", party->index); printHexBytes("0x", reda->rho, sizeof(hash_chunk), "\n", 0);
+    printf("u_%lu = ", party->index); printHexBytes("0x", reda->u, sizeof(hash_chunk), "\n", 0);
+    printf("paillier_N_%lu = ", party->index); printBIGNUM("", reda->paillier_pub->N, "\n");
+    printf("rped_N_%lu = ", party->index); printBIGNUM("", reda->rped_pub->N, "\n");
+    printf("s_%lu = ", party->index); printBIGNUM("", reda->rped_pub->s, "\n");
+    printf("t_%lu = ", party->index); printBIGNUM("", reda->rped_pub->t, "\n");
+
+    for (uint64_t j = 0; j < party->num_parties; ++j)
+    {
+      printf("X_%lue%lu = ", party->index, j); printECPOINT("", reda->reshare_public_X_j[j], party->ec, "\n", 1);
+      printf("A_%lue%lu = ", party->index, j); printECPOINT("", reda->commited_A_j[j], party->ec, "\n", 1);
+    }
   }
 }
 
 void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
 {
-  printf("### Refresh Phase, Round 3, Party %lu.\n", party->index);
+  printf("### Round 3.\n");
 
   cmp_refresh_data_t *reda = party->refresh_data;
 
@@ -942,21 +945,6 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
     }
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("echo_broadcast_%lu = ", j); printHexBytes("echo_broadcast = 0x", reda->payload[j]->echo_broadcast, sizeof(hash_chunk), "\n", 0);
-    printf("rho_%lu = ", j); printHexBytes("0x", reda->payload[j]->rho, sizeof(hash_chunk), "\n", 0);
-    printf("u_%lu = ", j); printHexBytes("0x", reda->payload[j]->u, sizeof(hash_chunk), "\n", 0);
-    printf("paillier_N_%lu = ", j); printBIGNUM("", reda->payload[j]->paillier_pub->N, "\n");
-    printf("rped_N_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->N, "\n");
-    printf("s_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->s, "\n");
-    printf("t_%lu = ", j); printBIGNUM("", reda->payload[j]->rped_pub->t, "\n");
-
-    for (uint64_t k = 0; k < party->num_parties; ++k)
-    {
-      printf("X_%lue%lu = ", j, k); printECPOINT("", reda->payload[j]->reshare_public_X_k[k], party->ec, "\n", 1);
-      printf("A_%lue%lu = ", j, k); printECPOINT("", reda->payload[j]->commited_A_k[k], party->ec, "\n", 1);
-    }
   }
   free(recv_bytes);
 
@@ -1086,20 +1074,23 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
 
   // Print
 
-  printf("### Publishe (psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
-  printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);
-  printf("# psi_mod_i = ...\n");
-  printf("# psi_rped_i = ...\n");
-  for (uint64_t j = 0; j < party->num_parties; ++j)
-  {
-    printf("# psi_sch_i_%lu = ...\n", j);
-    printf("Enc_%lu(x_%lue%lu) = ", j, party->index, j); printBIGNUM("", reda->encrypted_reshare_j[j], "\n");
+  printf("### Publish (psi_mod, psi_rped, psi_sch^j, Enc_j(x_i^j)).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
+  if (PRINT_VALUES)
+  {  
+    printHexBytes("combined rho = 0x", reda->combined_rho, sizeof(hash_chunk), "\n", 0);
+    printf("# psi_mod_i = ...\n");
+    printf("# psi_rped_i = ...\n");
+    for (uint64_t j = 0; j < party->num_parties; ++j)
+    {
+      printf("# psi_sch_i_%lu = ...\n", j);
+      printf("Enc_%lu(x_%lue%lu) = ", j, party->index, j); printBIGNUM("", reda->encrypted_reshare_j[j], "\n");
+    }
   }
 }
 
 void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
 {
-  printf("### Refresh Phase, Finalization Round, Party %lu.\n", party->index);
+  printf("### Finalization Round.\n");
 
   cmp_refresh_data_t *reda = party->refresh_data;
 
@@ -1138,15 +1129,6 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
     }
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
-
-    printf("### Received from Party %lu\t<<<\t%lu B\n", j, recv_bytes_len);
-    printf("# psi_mod_%lu = ...\n", j);
-    printf("# psi_rped_%lu = ...\n", j);
-    for (uint64_t k = 0; k < party->num_parties; ++k)
-    {
-      printf("# psi_sch_%lu = ...\n", k);
-      printf("Enc_%lu(x_%lue%lu) = ", k, j, k); printBIGNUM("", reda->payload[j]->encrypted_reshare_k[k], "\n");
-    }
   }
   free(recv_bytes);
 
@@ -1254,19 +1236,24 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   
   // Print
 
-  printf("### Stores fresh (secret x_i, all public X, paillier_N_i, rped_N_i, s_i, t_i).\t>>>\t%lu B, %lu ms\n", GROUP_ORDER_BYTES + party->num_parties*(GROUP_ELEMENT_BYTES + PAILLIER_MODULUS_BYTES + 3*RING_PED_MODULUS_BYTES), time_diff);
+  printf("### Stores fresh (secret x_i, all public X, paillier_N_i, rped_N_i, s_i, t_i).\t>>> %lu B, %lu ms\n", GROUP_ORDER_BYTES + party->num_parties*(GROUP_ELEMENT_BYTES + PAILLIER_MODULUS_BYTES + 3*RING_PED_MODULUS_BYTES), time_diff);
 
-  for (uint64_t i = 0; i < party->num_parties; ++i) 
+  if (PRINT_VALUES)
   {
-    printf("X_%lu = ", i); printECPOINT("", party->public_X[i], party->ec, "\n", 1);
-    printf("paillier_N_%lu = ", i); printBIGNUM("", party->paillier_pub[i]->N, "\n");
-    printf("rped_N_%lu = ", i); printBIGNUM("", party->rped_pub[i]->N, "\n");
-    printf("s_%lu = ", i); printBIGNUM("", party->rped_pub[i]->s, "\n");
-    printf("t_%lu = ", i); printBIGNUM("", party->rped_pub[i]->t, "\n");
-  }
+    for (uint64_t i = 0; i < party->num_parties; ++i) 
+    {
+      printf("X_%lu = ", i); printECPOINT("", party->public_X[i], party->ec, "\n", 1);
+      printf("paillier_N_%lu = ", i); printBIGNUM("", party->paillier_pub[i]->N, "\n");
+      printf("rped_N_%lu = ", i); printBIGNUM("", party->rped_pub[i]->N, "\n");
+      printf("s_%lu = ", i); printBIGNUM("", party->rped_pub[i]->s, "\n");
+      printf("t_%lu = ", i); printBIGNUM("", party->rped_pub[i]->t, "\n");
+    }
 
-  if (!PRINT_SECRETS) return;
-  printf("fresh_x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+    if (PRINT_SECRETS)
+    {
+      printf("fresh_x_%lu = ", party->index); printBIGNUM("", party->secret_x, "\n");
+    }
+  }
 }
 
 /******************************************** 
@@ -1430,7 +1417,7 @@ void cmp_presign_clean(cmp_party_t *party)
 
 void cmp_presign_round_1_exec (cmp_party_t *party)
 {
-   printf("### Presign Phase, Round 1, Party %lu.\n", party->index);
+   printf("### Round 1.\n");
 
   clock_t time_start = clock();
   uint64_t time_diff;
@@ -1465,7 +1452,7 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
     preda->psi_enc_j[j]->secret.rho = preda->rho;
     zkp_encryption_in_range_prove(preda->psi_enc_j[j], aux);
   }
-  //zkp_aux_info_free(aux);
+  zkp_aux_info_free(aux);
   
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
   preda->run_time += time_diff;
@@ -1482,9 +1469,6 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->K, 1);
   scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, preda->G, 1);
 
-  printf("K [%d]\n", BN_num_bits(preda->K));
-  printf("G [%d]\n", BN_num_bits(preda->G));
-
   uint8_t *curr_send_pos_j = curr_send;
 
   // zkp_encryption_in_range_t *zkp_enc_temp = zkp_encryption_in_range_new();
@@ -1495,62 +1479,44 @@ void cmp_presign_round_1_exec (cmp_party_t *party)
 
     curr_send = curr_send_pos_j;
     zkp_encryption_in_range_proof_to_bytes(&curr_send, &psi_enc_bytelen, preda->psi_enc_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
-    printf("psi_enc_j = "); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
-
-    // curr_send -= psi_enc_bytelen;
-    // zkp_encryption_in_range_proof_from_bytes(zkp_enc_temp, &curr_send, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
-    
-    // printf("A %d [%d]\n", scalar_equal(zkp_enc_temp->proof.A,     preda->psi_enc_j[j]->proof.A), BN_num_bits(preda->psi_enc_j[j]->proof.A));
-    // printf("C %d [%d]\n", scalar_equal(zkp_enc_temp->proof.C,     preda->psi_enc_j[j]->proof.C), BN_num_bits(preda->psi_enc_j[j]->proof.C));
-    // printf("S %d [%d]\n", scalar_equal(zkp_enc_temp->proof.S,     preda->psi_enc_j[j]->proof.S), BN_num_bits(preda->psi_enc_j[j]->proof.S));
-    // printf("z_1 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_1, preda->psi_enc_j[j]->proof.z_1), BN_num_bits(preda->psi_enc_j[j]->proof.z_1));
-    // printf("z_2 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_2, preda->psi_enc_j[j]->proof.z_2), BN_num_bits(preda->psi_enc_j[j]->proof.z_2));
-    // printf("z_3 %d [%d]\n", scalar_equal(zkp_enc_temp->proof.z_3, preda->psi_enc_j[j]->proof.z_3), BN_num_bits(preda->psi_enc_j[j]->proof.z_3));
-    
-    // zkp_enc_temp->public.paillier_pub = party->paillier_pub[party->index];
-    // zkp_enc_temp->public.rped_pub = party->rped_pub[j];
-    // zkp_enc_temp->public.G = party->ec;
-    // zkp_enc_temp->public.K = preda->K;
-    // zkp_enc_temp->public.k_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
-    // zkp_enc_temp->secret.k = preda->k;
-    // zkp_enc_temp->secret.rho = preda->rho;
-    // printf("%d\n", zkp_encryption_in_range_verify(zkp_enc_temp, aux));
-    // printf("psi_enc_%lue%lu = ", j, party->index); printHexBytes("", curr_send - psi_enc_bytelen, psi_enc_bytelen, "\n", 1);
 
     assert(curr_send == send_bytes + send_bytes_len);
 
     cmp_comm_send_bytes(party->index, j, 31, send_bytes, send_bytes_len);
   }
   free(send_bytes);
-  zkp_aux_info_free(aux);
-  // zkp_encryption_in_range_free(zkp_enc_temp);
 
   // Print
 
-  printf("### Broadcast (K_i, G_i). Send (psi_enc_j) to each Party j.\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+  printf("### Broadcast (K_i, G_i). Send (psi_enc_j) to each Party j.\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
 
-  printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
-  printf("K_%lu = ", party->index); printBIGNUM("", preda->K, "\n");
-  printf("G_%lu = ", party->index); printBIGNUM("", preda->G, "\n");
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  if (PRINT_VALUES)
   {
-    if (j == party->index) continue;
+    printHexBytes("sid_hash = 0x", party->sid_hash, sizeof(hash_chunk), "\n", 0);
+    printf("K_%lu = ", party->index); printBIGNUM("", preda->K, "\n");
+    printf("G_%lu = ", party->index); printBIGNUM("", preda->G, "\n");
+    for (uint64_t j = 0; j < party->num_parties; ++j)
+    {
+      if (j == party->index) continue;
 
-    printf("# psi_enc_%lu = ...\n", j);
+      printf("# psi_enc_%lu = ...\n", j);
+    }
+
+    if (PRINT_SECRETS)
+    {
+      printf("k_%lu = ", party->index); printBIGNUM("", preda->k, "\n");
+      printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
+      printf("rho_%lu = ", party->index); printBIGNUM("", preda->rho, "\n");
+      printf("nu_%lu = ", party->index); printBIGNUM("", preda->nu, "\n");
+    }
   }
-
-  if (!PRINT_SECRETS) return;
-  printf("k_%lu = ", party->index); printBIGNUM("", preda->k, "\n");
-  printf("gamma_%lu = ", party->index); printBIGNUM("", preda->gamma, "\n");
-  printf("rho_%lu = ", party->index); printBIGNUM("", preda->rho, "\n");
-  printf("nu_%lu = ", party->index); printBIGNUM("", preda->nu, "\n");
 }
 
 // TODO: add broadcast of first round common values, and verify at round 3
 
 void  cmp_presign_round_2_exec (cmp_party_t *party)
 {
-  printf("### Presign Phase, Round 2, Party %lu.\n", party->index);
+  printf("### Round 2.\n");
 
   cmp_presign_data_t *preda = party->presign_data;
 
@@ -1571,10 +1537,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
 
     scalar_from_bytes(preda->payload[j]->K, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
     scalar_from_bytes(preda->payload[j]->G, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-    printf("K_%lu = ", j); printBIGNUM("", preda->payload[j]->K, "\n");
-    printf("G_%lu = ", j); printBIGNUM("", preda->payload[j]->G, "\n");
-
-    printf("psi_enc_%lue%lu = 0x", party->index, j); printHexBytes("", curr_recv, psi_enc_bytelen, "\n", 1);
+  
     preda->payload[j]->psi_enc->public.paillier_pub = party->paillier_pub[j];
     preda->payload[j]->psi_enc->public.rped_pub = party->rped_pub[party->index];
     preda->payload[j]->psi_enc->public.G = party->ec;
@@ -1638,11 +1601,6 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
   scalar_t temp_enc   = scalar_new();
   scalar_t beta_range = scalar_new();
 
-  uint64_t bytelen;
-  zkp_operation_paillier_commitment_range_proof_to_bytes(NULL, &bytelen, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
-  uint8_t *bytes = malloc(bytelen);
-  zkp_operation_paillier_commitment_range_t *psi_affp_temp = zkp_operation_paillier_commitment_range_new();
-
   scalar_set_power_of_2(beta_range, 8*CALIGRAPHIC_J_ZKP_RANGE_BYTES);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1675,23 +1633,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     preda->psi_affp_j[j]->secret.rho_x = preda->nu;
     preda->psi_affp_j[j]->secret.rho_y = r;
     preda->psi_affp_j[j]->secret.rho = s;
-    printHexBytes("psi_affp_j aux = 0x", aux->info, aux->info_len, "\n", 1);
     zkp_operation_paillier_commitment_range_prove(preda->psi_affp_j[j], aux);
-
-    // zkp_operation_paillier_commitment_range_proof_to_bytes(&bytes, &bytelen, preda->psi_affp_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
-    // zkp_operation_paillier_commitment_range_proof_from_bytes(psi_affp_temp, &bytes, &bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
-    
-    // psi_affp_temp->public.paillier_pub_0 = preda->psi_affp_j[j]->public.paillier_pub_0;
-    // psi_affp_temp->public.paillier_pub_1 = preda->psi_affp_j[j]->public.paillier_pub_1;
-    // psi_affp_temp->public.rped_pub = preda->psi_affp_j[j]->public.rped_pub;
-    // psi_affp_temp->public.C = preda->psi_affp_j[j]->public.C;
-    // psi_affp_temp->public.G = preda->psi_affp_j[j]->public.G;
-    // psi_affp_temp->public.D = preda->psi_affp_j[j]->public.D;
-    // psi_affp_temp->public.X = preda->psi_affp_j[j]->public.X;
-    // psi_affp_temp->public.Y = preda->psi_affp_j[j]->public.Y;
-    // psi_affp_temp->public.x_range_bytes = preda->psi_affp_j[j]->public.x_range_bytes;
-    // psi_affp_temp->public.y_range_bytes = preda->psi_affp_j[j]->public.y_range_bytes;
-    // printf("\n# psi_affp_temp[%lu] verified? %d\n", j, zkp_operation_paillier_commitment_range_verify(psi_affp_temp, aux));
 
     // Create ZKP Paillier homomorphic operation against Group commitment
 
@@ -1753,7 +1695,7 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
   zkp_operation_group_commitment_range_proof_to_bytes(NULL, &psi_affg_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logG_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  uint64_t send_bytes_len =  (party->num_parties-1) * ( 8*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes) + GROUP_ELEMENT_BYTES; 
+  uint64_t send_bytes_len = GROUP_ELEMENT_BYTES + 8*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes; 
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
@@ -1783,36 +1725,41 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
 
   // Print
 
-  printf("### Send (Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+  printf("### Send (Gamma_i, D_{j,i}, F_{j,i}, D^_{j,i}, F^_{j,i}, psi_affp_j, psi_affg_j, psi_logG_j) to each Party j.\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
   
-  printf("Gamma_%lu = ", party->index); printECPOINT("", preda->Gamma, party->ec, "\n", 1);
-  
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  if (PRINT_VALUES)
   {
-    if (j == party->index) continue;
+    printf("Gamma_%lu = ", party->index); printECPOINT("", preda->Gamma, party->ec, "\n", 1);
+    
+    for (uint64_t j = 0; j < party->num_parties; ++j)
+    {
+      if (j == party->index) continue;
 
-    printf("D_%lue%lu = ", j, party->index); printBIGNUM("", preda->D_j[j], "\n");
-    printf("F_%lue%lu = ", j, party->index); printBIGNUM("", preda->F_j[j],  "\n");
-    printf("Dhat_%lue%lu = ", j, party->index); printBIGNUM("", preda->Dhat_j[j], "\n");
-    printf("Fhat_%lue%lu = ", j, party->index); printBIGNUM("", preda->Fhat_j[j],  "\n");
-    printf("# psi_affp_%lu = ...\n", j);
-    printf("# psi_affg_%lu = ...\n", j);
-    printf("# psi_logG_%lu = ...\n", j);
-  }
+      printf("D_%lue%lu = ", j, party->index); printBIGNUM("", preda->D_j[j], "\n");
+      printf("F_%lue%lu = ", j, party->index); printBIGNUM("", preda->F_j[j],  "\n");
+      printf("Dhat_%lue%lu = ", j, party->index); printBIGNUM("", preda->Dhat_j[j], "\n");
+      printf("Fhat_%lue%lu = ", j, party->index); printBIGNUM("", preda->Fhat_j[j],  "\n");
+      printf("# psi_affp_%lu = ...\n", j);
+      printf("# psi_affg_%lu = ...\n", j);
+      printf("# psi_logG_%lu = ...\n", j);
+    }
 
-  if (!PRINT_SECRETS) return;
-  for (uint64_t j = 0; j < party->num_parties; ++j)
-  {
-    if (j == party->index) continue;
+    if (PRINT_SECRETS)
+    {
+      for (uint64_t j = 0; j < party->num_parties; ++j)
+      {
+        if (j == party->index) continue;
 
-    printf("beta_%lue%lu = ", party->index, j); printBIGNUM("", preda->beta_j[j], "\n");
-    printf("betahat_%lue%lu = ", party->index, j); printBIGNUM("", preda->betahat_j[j],  "\n");
+        printf("beta_%lue%lu = ", party->index, j); printBIGNUM("", preda->beta_j[j], "\n");
+        printf("betahat_%lue%lu = ", party->index, j); printBIGNUM("", preda->betahat_j[j],  "\n");
+      }
+    }
   }
 }
 
 void  cmp_presign_round_3_exec (cmp_party_t *party)
 {
-  printf("### Presign Phase, Round 3, Party %lu.\n", party->index);
+  printf("### Round 3.\n");
 
   cmp_presign_data_t *preda = party->presign_data;
 
@@ -1825,7 +1772,7 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
   zkp_operation_group_commitment_range_proof_to_bytes(NULL, &psi_affg_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 0);
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logG_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  uint64_t recv_bytes_len =  (party->num_parties-1) * ( 8*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes) + GROUP_ELEMENT_BYTES; 
+  uint64_t recv_bytes_len =  GROUP_ELEMENT_BYTES + 8*PAILLIER_MODULUS_BYTES + psi_affp_bytes + psi_affg_bytes + psi_logG_bytes; 
   uint8_t *recv_bytes = malloc(recv_bytes_len);
   uint8_t *curr_recv;
 
@@ -1891,7 +1838,8 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
   zkp_aux_info_t *aux = zkp_aux_info_new(sizeof(uint64_t) + sizeof(hash_chunk), NULL);
   uint64_t aux_pos = 0;
   zkp_aux_info_update_move(aux, &aux_pos, party->sid_hash, sizeof(hash_chunk));
-  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));          // update later for each partyu
+  zkp_aux_info_update_move(aux, &aux_pos, &party->id, sizeof(uint64_t));          // update later for each party
+
   assert(aux->info_len == aux_pos);
 
   int *verified_psi_affp = calloc(party->num_parties, sizeof(int));
@@ -1904,7 +1852,6 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
 
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
 
-    printHexBytes("psi_affp_j aux = 0x", aux->info, aux->info_len, "\n", 1);
     verified_psi_affp[j] = zkp_operation_paillier_commitment_range_verify(preda->payload[j]->psi_affp, aux);
     verified_psi_affg[j] = zkp_operation_group_commitment_range_verify(preda->payload[j]->psi_affg, aux);
     verified_psi_logG[j] = zkp_group_vs_paillier_range_verify(preda->payload[j]->psi_logG, aux);
@@ -1973,7 +1920,7 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
   uint64_t psi_logK_bytes;
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logK_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  uint64_t send_bytes_len = GROUP_ELEMENT_BYTES + GROUP_ORDER_BYTES + (party->num_parties-1) * psi_logK_bytes; 
+  uint64_t send_bytes_len = GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + psi_logK_bytes; 
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
@@ -1988,28 +1935,32 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
 
     curr_send = curr_send_pos_j;
     zkp_group_vs_paillier_range_proof_to_bytes(&curr_send, &psi_logK_bytes, preda->psi_logK_j[j], CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
+
     assert(curr_send == send_bytes + send_bytes_len);
 
-    cmp_comm_send_bytes(party->index, j, 32, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 33, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
   // Print
 
-  printf("### Publish (delta_i, Delta_i, psi_logK_j)).\t>>>\t%lu B, %lu ms\n", send_bytes_len, time_diff);
+  printf("### Publish (delta_i, Delta_i, psi_logK_j)).\t>>> %lu B, %lu ms\n", send_bytes_len, time_diff);
 
-  if (!PRINT_SECRETS) return;
-  printf("delta_%lu = ", party->index); printBIGNUM("", preda->delta, "\n");
-  printf("Delta_%lu = ", party->index); printECPOINT("", preda->Delta, party->ec, "\n", 1);
-  for (uint64_t j = 0; j < party->num_parties; ++j)
+  if (PRINT_VALUES && PRINT_SECRETS)
   {
-    printf("# psi_logK_%lu = ...\n", j);
+    printf("delta_%lu = ", party->index); printBIGNUM("", preda->delta, "\n");
+    printf("Delta_%lu = ", party->index); printECPOINT("", preda->Delta, party->ec, "\n", 1);
+    for (uint64_t j = 0; j < party->num_parties; ++j)
+    {
+      if (j == party->index) continue;
+      printf("# psi_logK_%lue%lu = ...\n", party->index, j);
+    }
   }
 }
 
 void  cmp_presign_final_exec (cmp_party_t *party)
 {
-    printf("### Presign Phase, Finalization Round, Party %lu.\n", party->index);
+  printf("### Finalization Round.\n");
 
   cmp_presign_data_t *preda = party->presign_data;
 
@@ -2018,7 +1969,7 @@ void  cmp_presign_final_exec (cmp_party_t *party)
   uint64_t psi_logK_bytes;
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &psi_logK_bytes, NULL, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 0);
 
-  uint64_t recv_bytes_len =  (party->num_parties-1) * (psi_logK_bytes) + GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES; 
+  uint64_t recv_bytes_len =  GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES + psi_logK_bytes; 
   uint8_t *recv_bytes = malloc(recv_bytes_len);
   uint8_t *curr_recv;
 
@@ -2026,7 +1977,7 @@ void  cmp_presign_final_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
 
-    cmp_comm_receive_bytes(j, party->index, 32, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 33, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     scalar_from_bytes(preda->payload[j]->delta, &curr_recv, GROUP_ORDER_BYTES, 1);
@@ -2086,7 +2037,9 @@ void  cmp_presign_final_exec (cmp_party_t *party)
     group_operation(combined_Delta, combined_Delta, preda->payload[i]->Delta, NULL, party->ec);
   }
   group_operation(gen_to_delta, NULL, party->ec_gen, combined_delta, party->ec);
+  
   assert(PAILLIER_MODULUS_BYTES >= CALIGRAPHIC_J_ZKP_RANGE_BYTES);    // The following ZKP is valid when N is bigger then beta's range)
+
   verified_delta = group_elem_equal(gen_to_delta, combined_Delta, party->ec);
 
   if (verified_delta != 1) printf("%sParty %lu: failed equality of g^{delta} = combined_Delta\n",ERR_STR, party->index);
@@ -2106,12 +2059,18 @@ void  cmp_presign_final_exec (cmp_party_t *party)
   
   // Print 
 
-  printf("### Store (R, k_i, chi_i).\t>>>\t%d B, %lu ms\n",  2*GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES, time_diff);
-  printf("R = "); printECPOINT("", party->R, party->ec, "\n", 1);  
+  printf("### Store (R, k_i, chi_i).\t>>> %d B, %lu ms\n",  2*GROUP_ORDER_BYTES + GROUP_ELEMENT_BYTES, time_diff);
 
-  if (!PRINT_SECRETS) return;
-  printf("k_%lu = ", party->index); printBIGNUM("", party->k, "\n");
-  printf("chi_%lu = ", party->index); printBIGNUM("", party->chi, "\n");
+  if (PRINT_VALUES)
+  {
+    printf("R = "); printECPOINT("", party->R, party->ec, "\n", 1);  
+
+    if (PRINT_SECRETS)
+    {
+      printf("k_%lu = ", party->index); printBIGNUM("", party->k, "\n");
+      printf("chi_%lu = ", party->index); printBIGNUM("", party->chi, "\n");
+    }
+  }
 }
 
 void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, const scalar_t msg)

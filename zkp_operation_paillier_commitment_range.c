@@ -254,9 +254,6 @@ void zkp_operation_paillier_commitment_range_proof_to_bytes(uint8_t **bytes, uin
   uint64_t bytelen;
   scalar_t range = scalar_new();
   scalar_t unsigned_value = scalar_new();
- 
-  scalar_t mod_range = scalar_new();
-  scalar_t unsigned_scalar = scalar_new();
 
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.A, 1);
   scalar_to_bytes(&set_bytes, 2 * PAILLIER_MODULUS_BYTES, zkp->proof.B_x, 1);
