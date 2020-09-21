@@ -65,8 +65,8 @@ typedef struct
   gr_elem_t public_X;
 
   // Schnorr ZKP 
-  gr_elem_t       commited_A;
-  zkp_schnorr_t   *psi_sch;
+  gr_elem_t           commited_A;
+  zkp_schnorr_proof_t *psi_sch;
 
   // Echo broadcast and random oracle data seed
   hash_chunk srid;
@@ -84,9 +84,9 @@ typedef struct
   gr_elem_t public_X;
 
   // ZKP Schnorr
-  scalar_t      tau;
-  gr_elem_t     commited_A;
-  zkp_schnorr_t *psi_sch;
+  scalar_t            tau;
+  gr_elem_t           commited_A;
+  zkp_schnorr_proof_t *psi_sch;
 
   // Echo broadcast and random oracle data seed
   uint8_t *srid;
@@ -121,7 +121,7 @@ typedef struct
   
   // ZKP data
   gr_elem_t                   *commited_A_k;
-  zkp_schnorr_t               **psi_sch_k;
+  zkp_schnorr_proof_t         **psi_sch_k;
   zkp_paillier_blum_modulus_t *psi_mod;
   zkp_ring_pedersen_param_t   *psi_rped;
 
@@ -138,9 +138,9 @@ typedef struct
 {
   // Paillier and ring pedersen keys
   paillier_private_key_t  *paillier_priv;
-  paillier_public_key_t  *paillier_pub;
+  paillier_public_key_t   *paillier_pub;
   ring_pedersen_private_t *rped_priv;
-  ring_pedersen_public_t *rped_pub;
+  ring_pedersen_public_t  *rped_pub;
 
   // Resharing the same secret, and paillier commitments of shares
   scalar_t  *reshare_secret_x_j;
@@ -150,7 +150,7 @@ typedef struct
   // All ZKP
   scalar_t                    *tau_j;
   gr_elem_t                   *commited_A_j;
-  zkp_schnorr_t               **psi_sch_j;
+  zkp_schnorr_proof_t         **psi_sch_j;
   zkp_paillier_blum_modulus_t *psi_mod;
   zkp_ring_pedersen_param_t   *psi_rped;
 

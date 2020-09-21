@@ -209,7 +209,7 @@ void cmp_key_generation_init(cmp_party_t *party)
     kgd->payload[j] = malloc(sizeof(cmp_key_generation_payload_t));
     kgd->payload[j]->commited_A = group_elem_new(party->ec);
     kgd->payload[j]->public_X = group_elem_new(party->ec);
-    kgd->payload[j]->psi_sch = zkp_schnorr_new();
+    kgd->payload[j]->psi_sch = zkp_schnorr_new(party->ec);
   }
 
   kgd->secret_x = scalar_new();
@@ -278,10 +278,10 @@ void  cmp_key_generation_round_1_exec (cmp_party_t *party)
   scalar_sample_in_range(kgd->secret_x, party->ec_order, 0);
   group_operation(kgd->public_X, NULL, party->ec_gen, kgd->secret_x, party->ec);
 
-  kgd->psi_sch->public.G = party->ec;
-  kgd->psi_sch->public.g = party->ec_gen;
-  zkp_schnorr_commit(kgd->psi_sch, kgd->tau);
-  group_elem_copy(kgd->commited_A, kgd->psi_sch->proof.A);
+  zkp_schnorr_public_t psi_sch_public;
+  psi_sch_public.G = party->ec;
+  psi_sch_public.g = party->ec_gen;
+  zkp_schnorr_commit(kgd->commited_A, kgd->tau, &psi_sch_public);
 
   cmp_sample_bytes(kgd->srid, sizeof(hash_chunk));
   cmp_sample_bytes(kgd->u, sizeof(hash_chunk));
@@ -469,9 +469,16 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   assert(aux->info_len == aux_pos);
 
   // Set Schnorr ZKP public claim and secret, then prove
-  kgd->psi_sch->public.X = kgd->public_X;
-  kgd->psi_sch->secret.x = kgd->secret_x;
-  zkp_schnorr_prove(kgd->psi_sch, aux, kgd->tau);
+  
+  zkp_schnorr_public_t psi_sch_public;
+  psi_sch_public.G = party->ec;
+  psi_sch_public.g = party->ec_gen;
+  psi_sch_public.X = kgd->public_X;
+  
+  zkp_schnorr_secret_t psi_sch_secret;
+  psi_sch_secret.x = kgd->secret_x;
+
+  zkp_schnorr_prove(kgd->psi_sch, &psi_sch_public, kgd->tau, &psi_sch_secret, aux);
   zkp_aux_info_free(aux);
 
   time_diff = (clock() - time_start) * 1000 /CLOCKS_PER_SEC;
@@ -480,12 +487,12 @@ void  cmp_key_generation_round_3_exec (cmp_party_t *party)
   // Send payload to parties
 
   uint64_t psi_sch_byte_len;
-  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_byte_len, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_byte_len, NULL, party->ec, 0);
   uint64_t send_bytes_len = psi_sch_byte_len;
   uint8_t *send_bytes = malloc(send_bytes_len);
   uint8_t *curr_send = send_bytes;
 
-  zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_byte_len, kgd->psi_sch, 1);
+  zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_byte_len, kgd->psi_sch, party->ec, 1);
   
   assert(curr_send == send_bytes + send_bytes_len);
 
@@ -515,7 +522,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   // Receive payload from parties
 
   uint64_t psi_sch_byte_len;
-  zkp_schnorr_proof_from_bytes(NULL, NULL, &psi_sch_byte_len, 0);
+  zkp_schnorr_proof_from_bytes(NULL, NULL, &psi_sch_byte_len, party->ec, 0);
   uint64_t recv_bytes_len = psi_sch_byte_len;
   uint8_t *recv_bytes = malloc(recv_bytes_len);
   uint8_t *curr_recv;
@@ -526,10 +533,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
     cmp_comm_receive_bytes(j, party->index, 13, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
     
-    kgd->payload[j]->psi_sch->public.G = party->ec;
-    kgd->payload[j]->psi_sch->public.g = party->ec_gen;
-    kgd->payload[j]->psi_sch->public.X = kgd->payload[j]->public_X;
-    zkp_schnorr_proof_from_bytes(kgd->payload[j]->psi_sch, &curr_recv, &psi_sch_byte_len, 1);
+    zkp_schnorr_proof_from_bytes(kgd->payload[j]->psi_sch, &curr_recv, &psi_sch_byte_len, party->ec, 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
   }
@@ -553,14 +557,19 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   zkp_aux_info_update_move(aux, &aux_pos, party->srid, sizeof(hash_chunk));
   assert(aux->info_len == aux_pos);
 
+  zkp_schnorr_public_t psi_sch_public_j;
+  psi_sch_public_j.G = party->ec;
+  psi_sch_public_j.g = party->ec_gen;
+
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
     
-    verified_A[j] = group_elem_equal(kgd->payload[j]->psi_sch->proof.A, kgd->payload[j]->commited_A, party->ec);
+    verified_A[j] = group_elem_equal(kgd->payload[j]->psi_sch->A, kgd->payload[j]->commited_A, party->ec);
 
+    psi_sch_public_j.X = kgd->payload[j]->public_X;
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));              // Update i to commiting player
-    verified_psi[j] = zkp_schnorr_verify(kgd->payload[j]->psi_sch, aux);
+    verified_psi[j] = zkp_schnorr_verify(&psi_sch_public_j, kgd->payload[j]->psi_sch, aux);
   }
   zkp_aux_info_free(aux);
 
@@ -615,7 +624,7 @@ void cmp_refresh_aux_info_init(cmp_party_t *party)
     reda->payload[j]->rped_pub            = ring_pedersen_public_new();
     reda->payload[j]->psi_mod             = zkp_paillier_blum_new();
     reda->payload[j]->psi_rped            = zkp_ring_pedersen_param_new();
-    reda->payload[j]->psi_sch_k           = calloc(party->num_parties, sizeof(zkp_schnorr_t*)); 
+    reda->payload[j]->psi_sch_k           = calloc(party->num_parties, sizeof(zkp_schnorr_proof_t*)); 
     reda->payload[j]->commited_A_k        = calloc(party->num_parties, sizeof(gr_elem_t));
     reda->payload[j]->encrypted_reshare_k = calloc(party->num_parties, sizeof(scalar_t));
     reda->payload[j]->reshare_public_X_k  = calloc(party->num_parties, sizeof(gr_elem_t));
@@ -625,7 +634,7 @@ void cmp_refresh_aux_info_init(cmp_party_t *party)
       reda->payload[j]->encrypted_reshare_k[k] = scalar_new();
       reda->payload[j]->reshare_public_X_k[k]  = group_elem_new(party->ec);
       reda->payload[j]->commited_A_k[k]        = group_elem_new(party->ec);
-      reda->payload[j]->psi_sch_k[k]           = zkp_schnorr_new();
+      reda->payload[j]->psi_sch_k[k]           = zkp_schnorr_new(party->ec);
     }
   }
 
@@ -753,14 +762,17 @@ void cmp_refresh_aux_info_round_1_exec (cmp_party_t *party)
   time_start = clock();
   
   // Sample other parties' reshares, set negative of sum for self
+  
+  zkp_schnorr_public_t psi_sch_public_j;
+  psi_sch_public_j.G = party->ec;
+  psi_sch_public_j.g = party->ec_gen;
+
   scalar_set_ul(reda->reshare_secret_x_j[party->index], 0);
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     // Initialize relevant zkp
-    reda->psi_sch_j[j]->public.G = party->ec;
-    reda->psi_sch_j[j]->public.g = party->ec_gen;
-    zkp_schnorr_commit(reda->psi_sch_j[j], reda->tau_j[j]);
-    group_elem_copy(reda->commited_A_j[j], reda->psi_sch_j[j]->proof.A);
+  
+    zkp_schnorr_commit(reda->commited_A_j[j], reda->tau_j[j], &psi_sch_public_j);
 
     // Dont choose your own values
     if (j == party->index) continue; 
@@ -1023,6 +1035,13 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   zkp_ring_pedersen_param_prove(reda->psi_rped, aux);
 
   // Encrypt refresh shares and Schnorr prove
+  
+  zkp_schnorr_public_t psi_sch_public_j;
+  psi_sch_public_j.G = party->ec;
+  psi_sch_public_j.g = party->ec_gen;
+
+  zkp_schnorr_secret_t psi_sch_secret_j;
+
   scalar_t temp_paillier_rand = scalar_new();
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
@@ -1030,9 +1049,9 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
     paillier_encryption_sample(temp_paillier_rand, reda->payload[j]->paillier_pub);
     paillier_encryption_encrypt(reda->encrypted_reshare_j[j], reda->reshare_secret_x_j[j], temp_paillier_rand, reda->payload[j]->paillier_pub);
 
-    reda->psi_sch_j[j]->public.X = reda->reshare_public_X_j[j];
-    reda->psi_sch_j[j]->secret.x = reda->reshare_secret_x_j[j];
-    zkp_schnorr_prove(reda->psi_sch_j[j], aux, reda->tau_j[j]);
+    psi_sch_public_j.X = reda->reshare_public_X_j[j];
+    psi_sch_secret_j.x = reda->reshare_secret_x_j[j];
+    zkp_schnorr_prove(reda->psi_sch_j[j], &psi_sch_public_j, reda->tau_j[j], &psi_sch_secret_j, aux);
   }
   scalar_free(temp_paillier_rand);
   zkp_aux_info_free(aux);
@@ -1047,7 +1066,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   uint64_t psi_sch_bytelen;
   zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytelen, NULL, 0);
   zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytelen, NULL, 0);
-  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, party->ec, 0);
 
   uint64_t send_bytes_len =  psi_mod_bytelen + psi_rped_bytelen + party->num_parties * (psi_sch_bytelen + 2*PAILLIER_MODULUS_BYTES);
   uint8_t *send_bytes = malloc(send_bytes_len);
@@ -1058,7 +1077,7 @@ void  cmp_refresh_aux_info_round_3_exec (cmp_party_t *party)
   
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
-    zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_bytelen, reda->psi_sch_j[j], 1);
+    zkp_schnorr_proof_to_bytes(&curr_send, &psi_sch_bytelen, reda->psi_sch_j[j], party->ec, 1);
     scalar_to_bytes(&curr_send, 2*PAILLIER_MODULUS_BYTES, reda->encrypted_reshare_j[j], 1);
   }
   
@@ -1101,7 +1120,7 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   uint64_t psi_sch_bytelen;
   zkp_ring_pedersen_param_proof_to_bytes(NULL, &psi_rped_bytelen, NULL, 0);
   zkp_paillier_blum_proof_to_bytes(NULL, &psi_mod_bytelen, NULL, 0);
-  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, 0);
+  zkp_schnorr_proof_to_bytes(NULL, &psi_sch_bytelen, NULL, party->ec, 0);
 
   uint64_t recv_bytes_len = psi_mod_bytelen + psi_rped_bytelen + party->num_parties * (psi_sch_bytelen + 2*PAILLIER_MODULUS_BYTES);
   uint8_t *recv_bytes = malloc(recv_bytes_len);
@@ -1121,10 +1140,7 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
     
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
-      reda->payload[j]->psi_sch_k[k]->public.G = party->ec;
-      reda->payload[j]->psi_sch_k[k]->public.g = party->ec_gen;
-      reda->payload[j]->psi_sch_k[k]->public.X = reda->payload[j]->reshare_public_X_k[k];
-      zkp_schnorr_proof_from_bytes(reda->payload[j]->psi_sch_k[k], &curr_recv, &psi_sch_bytelen, 1);
+      zkp_schnorr_proof_from_bytes(reda->payload[j]->psi_sch_k[k], &curr_recv, &psi_sch_bytelen, party->ec, 1);
       scalar_from_bytes(reda->payload[j]->encrypted_reshare_k[k], &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
     }
 
@@ -1157,6 +1173,10 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
   scalar_t sum_received_reshares = scalar_new();
   gr_elem_t ver_public = group_elem_new(party->ec);
   
+  zkp_schnorr_public_t psi_sch_public_j_k;
+  psi_sch_public_j_k.G = party->ec;
+  psi_sch_public_j_k.g = party->ec_gen;
+
   // Sum all secret reshares, self and generated by others for self
   scalar_copy(sum_received_reshares, reda->reshare_secret_x_j[party->index]);
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -1176,8 +1196,9 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
 
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
-      verified_A_k[k + party->num_parties*j] = group_elem_equal(reda->payload[j]->psi_sch_k[k]->proof.A, reda->payload[j]->commited_A_k[k], party->ec) == 1;
-      verified_psi_sch_k[k + party->num_parties*j] = (zkp_schnorr_verify(reda->payload[j]->psi_sch_k[k], aux) == 1);
+      verified_A_k[k + party->num_parties*j] = group_elem_equal(reda->payload[j]->psi_sch_k[k]->A, reda->payload[j]->commited_A_k[k], party->ec) == 1;
+      psi_sch_public_j_k.X = reda->payload[j]->reshare_public_X_k[k];
+      verified_psi_sch_k[k + party->num_parties*j] = (zkp_schnorr_verify(&psi_sch_public_j_k, reda->payload[j]->psi_sch_k[k], aux) == 1);
     }
   }
   scalar_free(received_reshare);

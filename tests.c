@@ -269,45 +269,49 @@ void test_zkp_schnorr()
   aux.info = NULL;
   aux.info_len = 0;
 
-  zkp_schnorr_t *zkp = zkp_schnorr_new();
-  
-  zkp->public.G = ec_group_new();
-  zkp->public.g = ec_group_generator(zkp->public.G);
-  zkp->public.X = group_elem_new(zkp->public.G);
+  zkp_schnorr_public_t zkp_public;
+  zkp_public.G = ec_group_new();
+  zkp_public.g = ec_group_generator(zkp_public.G);
+  zkp_public.X = group_elem_new(zkp_public.G);
 
-  zkp->secret.x = scalar_new();
-  scalar_sample_in_range(zkp->secret.x, ec_group_order(zkp->public.G), 0);
+  zkp_schnorr_proof_t *zkp_proof = zkp_schnorr_new(zkp_public.G);
 
-  group_operation(zkp->public.X, NULL, zkp->public.g, zkp->secret.x, zkp->public.G);
+  zkp_schnorr_secret_t zkp_secret;
+  zkp_secret.x = scalar_new();
+  scalar_sample_in_range(zkp_secret.x, ec_group_order(zkp_public.G), 0);
+
+  group_operation(zkp_public.X, NULL, zkp_public.g, zkp_secret.x, zkp_public.G);
 
   scalar_t alpha = scalar_new();
 
-  zkp_schnorr_commit(zkp, alpha);
-  zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# 1 == %d : valid\n", zkp_schnorr_verify(zkp, &aux));
+  zkp_schnorr_commit(zkp_proof->A, alpha, &zkp_public);
+  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
+  printf("# 1 == %d : valid\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
 
   BN_add_word(alpha,1);
-  zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# 1 == %d : alpha changed\n", zkp_schnorr_verify(zkp, &aux));
+  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
+  printf("# 1 == %d : alpha changed\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
 
-  BN_add_word(zkp->secret.x,1);
-  zkp_schnorr_prove(zkp, &aux, alpha);
-  printf("# 0 == %d : wrond secret.x\n", zkp_schnorr_verify(zkp, &aux));
+  BN_add_word(zkp_secret.x,1);
+  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
+  printf("# 0 == %d : wrond secret.x\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
 
-  BN_sub_word(zkp->secret.x,1);
-  BN_add_word(zkp->proof.z, 1);
-  printf("# 0 == %d : wrong z\n", zkp_schnorr_verify(zkp, &aux));
+  BN_sub_word(zkp_secret.x,1);
+  BN_add_word(zkp_proof->z, 1);
+  printf("# 0 == %d : wrong z\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
 
   aux.info = malloc(1);
   aux.info_len = 1;
-  printf("# 0 == %d : wrong aux\n", zkp_schnorr_verify(zkp, &aux));
+  printf("# 0 == %d : wrong aux\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
   
   free(aux.info);
   scalar_free(alpha);
-  scalar_free(zkp->secret.x);
-  group_elem_free(zkp->public.X);
-  ec_group_free(zkp->public.G);
-  zkp_schnorr_free(zkp);
+  scalar_free(zkp_secret.x);
+  
+  group_elem_free(zkp_public.X);
+  ec_group_free(zkp_public.G);
+
+  zkp_schnorr_free(zkp_proof);
 }
 
 void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub, uint64_t k_range_bytes)
