@@ -379,6 +379,7 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
+    
     cmp_comm_send_bytes(party->index, j, 12, send_bytes, send_bytes_len);
   }
   free(send_bytes);
