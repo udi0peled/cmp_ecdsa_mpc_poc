@@ -43,6 +43,8 @@ void      scalar_to_bytes          (uint8_t **bytes, uint64_t byte_len, const sc
 void      scalar_from_bytes        (scalar_t num, uint8_t **bytes, uint64_t byte_len, int move_to_end);
 int       scalar_equal             (const scalar_t a, const scalar_t b);
 int       scalar_bitlength         (const scalar_t a);
+void      scalar_gcd               (scalar_t result, const scalar_t first, const scalar_t second);
+int       scalar_coprime           (const scalar_t first, const scalar_t second);
 void      scalar_add               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
 void      scalar_sub               (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus);
 void      scalar_negate            (scalar_t result, const scalar_t num);

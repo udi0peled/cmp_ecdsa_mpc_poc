@@ -67,6 +67,22 @@ void scalar_inv (scalar_t result, const scalar_t num, const scalar_t modulus)
   BN_CTX_free(bn_ctx);
 }
 
+void scalar_gcd (scalar_t result, const scalar_t first, const scalar_t second)
+{
+  BN_CTX *bn_ctx = BN_CTX_secure_new();
+  BN_gcd(result, first, second, bn_ctx);
+  BN_CTX_free(bn_ctx);
+}
+
+int scalar_coprime (const scalar_t first, const scalar_t second)
+{
+  scalar_t gcd = scalar_new();
+  scalar_gcd(gcd, first, second);
+  int res = BN_is_one(gcd);
+  scalar_free(gcd);
+  return res;
+}
+
 void scalar_exp (scalar_t result, const scalar_t base, const scalar_t exp, const scalar_t modulus)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();

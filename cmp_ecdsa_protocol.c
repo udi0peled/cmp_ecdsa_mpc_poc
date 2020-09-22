@@ -379,7 +379,7 @@ void  cmp_key_generation_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    
+
     cmp_comm_send_bytes(party->index, j, 12, send_bytes, send_bytes_len);
   }
   free(send_bytes);
@@ -1129,13 +1129,11 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
     curr_recv = recv_bytes;
     
     zkp_paillier_blum_proof_from_bytes(reda->payload[j]->psi_mod, &curr_recv, &psi_mod_bytelen, 1);
-
     zkp_ring_pedersen_param_proof_from_bytes(reda->payload[j]->psi_rped, &curr_recv, &psi_rped_bytelen, 1);
-    
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
       zkp_schnorr_proof_from_bytes(reda->payload[j]->psi_sch_k[k], &curr_recv, &psi_sch_bytelen, party->ec, 1);
-      scalar_from_bytes(reda->payload[j]->encrypted_reshare_k[k], &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
+      paillier_ciphertext_from_bytes(reda->payload[j]->encrypted_reshare_k[k], &curr_recv, 2*PAILLIER_MODULUS_BYTES, reda->payload[k]->paillier_pub->N, 1);
     }
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
@@ -1196,7 +1194,6 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
       verified_psi_sch_k[k + party->num_parties*j] = (zkp_schnorr_verify(reda->payload[j]->psi_sch_k[k], &psi_sch_public_j_k, aux) == 1);
     }
   }
-  scalar_free(received_reshare);
   zkp_aux_info_free(aux);
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -1209,7 +1206,6 @@ void cmp_refresh_aux_info_final_exec(cmp_party_t *party)
     for (uint64_t k = 0; k < party->num_parties; ++k)
     {
       if (verified_psi_sch_k[k + party->num_parties*j] != 1) printf("%sParty %lu: Schnorr ZKP failed verification from Party %lu for Party %lu\n",ERR_STR, party->index, j, k);
-
       if (verified_A_k[k + party->num_parties*j] != 1) printf("%sParty %lu: schnorr zkp commited A (psi_sch.proof.A) different from previous round from Party %lu for Party %lu\n",ERR_STR, party->index, j, k);
     }
   }
@@ -1555,9 +1551,8 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
     cmp_comm_receive_bytes(j, party->index, 31, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
-    scalar_from_bytes(preda->payload[j]->K, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-    scalar_from_bytes(preda->payload[j]->G, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-
+    paillier_ciphertext_from_bytes(preda->payload[j]->K, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[j]->N, 1);
+    paillier_ciphertext_from_bytes(preda->payload[j]->G, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[j]->N, 1);
     zkp_encryption_in_range_proof_from_bytes(preda->payload[j]->psi_enc, &curr_recv, &psi_enc_bytelen, CALIGRAPHIC_I_ZKP_RANGE_BYTES, 1);
 
     assert(curr_recv == recv_bytes + recv_bytes_len);
@@ -1568,8 +1563,6 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
 
   clock_t time_start = clock();
   uint64_t time_diff;
-
-  int *verified_psi_enc = calloc(party->num_parties, sizeof(int));
 
   // Echo broadcast - Send hash of all K_j,G_j
   uint8_t *temp_bytes = malloc(PAILLIER_MODULUS_BYTES);
@@ -1600,16 +1593,22 @@ void  cmp_presign_round_2_exec (cmp_party_t *party)
   psi_enc_public_j.challenge_modulus = ec_group_order(party->ec);  
   psi_enc_public_j.rped_pub = party->rped_pub[party->index];
     
+  int *verified_psi_enc   = calloc(party->num_parties, sizeof(int));
+
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-
+    
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
 
     psi_enc_public_j.paillier_pub = party->paillier_pub[j];
     psi_enc_public_j.K = preda->payload[j]->K;
     verified_psi_enc[j] = zkp_encryption_in_range_verify(preda->payload[j]->psi_enc, &psi_enc_public_j, aux);
+  }
 
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue;
     if (verified_psi_enc[j] != 1)  printf("%sParty %lu: failed verification of psi_enc from Party %lu\n",ERR_STR, party->index, j);
   }
   free(verified_psi_enc);
@@ -1821,10 +1820,10 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
     curr_recv = recv_bytes;
 
     group_elem_from_bytes(preda->payload[j]->Gamma, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
-    scalar_from_bytes(preda->payload[j]->D, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-    scalar_from_bytes(preda->payload[j]->F, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-    scalar_from_bytes(preda->payload[j]->Dhat, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
-    scalar_from_bytes(preda->payload[j]->Fhat, &curr_recv, 2*PAILLIER_MODULUS_BYTES, 1);
+    paillier_ciphertext_from_bytes(preda->payload[j]->D, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[party->index]->N, 1);
+    paillier_ciphertext_from_bytes(preda->payload[j]->F, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[j]->N, 1);
+    paillier_ciphertext_from_bytes(preda->payload[j]->Dhat, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[party->index]->N, 1);
+    paillier_ciphertext_from_bytes(preda->payload[j]->Fhat, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[j]->N, 1);
 
     zkp_oper_paillier_commit_range_proof_from_bytes(preda->payload[j]->psi_affp, &curr_recv, &psi_affp_bytes, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, 1);
     zkp_oper_group_commit_range_proof_from_bytes(preda->payload[j]->psi_affg, &curr_recv, &psi_affg_bytes, CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES, party->ec,1);
@@ -1849,9 +1848,13 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
 
   assert(aux->info_len == aux_pos);
 
-  int *verified_psi_affp = calloc(party->num_parties, sizeof(int));
-  int *verified_psi_affg = calloc(party->num_parties, sizeof(int));
-  int *verified_psi_logG = calloc(party->num_parties, sizeof(int));
+  int *verified_coprime_D    = calloc(party->num_parties, sizeof(int));
+  int *verified_coprime_F    = calloc(party->num_parties, sizeof(int));
+  int *verified_coprime_Dhat = calloc(party->num_parties, sizeof(int));
+  int *verified_coprime_Fhat = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_affp     = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_affg     = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_logG     = calloc(party->num_parties, sizeof(int));
 
   zkp_oper_paillier_commit_range_public_t psi_affp_public_j;
   psi_affp_public_j.x_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
@@ -1880,6 +1883,11 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
   {
     if (j == party->index) continue; 
 
+    verified_coprime_D[j] = scalar_coprime(preda->payload[j]->D, party->paillier_pub[party->index]->N) == 1;
+    verified_coprime_F[j] = scalar_coprime(preda->payload[j]->F, party->paillier_pub[j]->N) == 1;
+    verified_coprime_Dhat[j] = scalar_coprime(preda->payload[j]->Dhat, party->paillier_pub[party->index]->N) == 1;
+    verified_coprime_Fhat[j] = scalar_coprime(preda->payload[j]->Fhat, party->paillier_pub[j]->N) == 1;
+
     zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
 
     psi_affp_public_j.paillier_pub_1 = party->paillier_pub[j];
@@ -1898,12 +1906,25 @@ void  cmp_presign_round_3_exec (cmp_party_t *party)
     psi_logG_public_j.X = preda->payload[j]->Gamma;
     psi_logG_public_j.C = preda->payload[j]->G;
     verified_psi_logG[j] = zkp_group_vs_paillier_range_verify(preda->payload[j]->psi_logG, &psi_logG_public_j, aux);
+  }
 
+  for (uint64_t j = 0; j < party->num_parties; ++j)
+  {
+    if (j == party->index) continue; 
+
+    if (verified_coprime_D[j] != 1) printf("%sParty %lu: non coprime D from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_coprime_F[j] != 1) printf("%sParty %lu: non coprime F from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_coprime_Dhat[j] != 1) printf("%sParty %lu: non coprime Dhat from Party %lu\n",ERR_STR, party->index, j);
+    if (verified_coprime_Fhat[j] != 1) printf("%sParty %lu: non coprime Fhat from Party %lu\n",ERR_STR, party->index, j);
+    
     if (verified_psi_affp[j] != 1) printf("%sParty %lu: failed verification of psi_affp from Party %lu\n",ERR_STR, party->index, j);
     if (verified_psi_affg[j] != 1) printf("%sParty %lu: failed verification of psi_affg from Party %lu\n",ERR_STR, party->index, j);
     if (verified_psi_logG[j] != 1) printf("%sParty %lu: failed verification of psi_logG from Party %lu\n",ERR_STR, party->index, j);
   }
-
+  free(verified_coprime_D);
+  free(verified_coprime_F);
+  free(verified_coprime_Dhat);
+  free(verified_coprime_Fhat);
   free(verified_psi_affp);
   free(verified_psi_affg);
   free(verified_psi_logG);

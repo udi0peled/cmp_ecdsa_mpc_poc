@@ -219,3 +219,26 @@ void paillier_public_from_bytes (paillier_public_key_t *pub, uint8_t **bytes, ui
   *byte_len = needed_byte_len;
   if (move_to_end) *bytes = read_bytes;
 }
+
+void paillier_ciphertext_from_bytes (scalar_t ciphertext, uint8_t **bytes, uint64_t byte_len, const scalar_t paillier_N, int move_to_end)
+{  
+  if ((!bytes) || (!*bytes) || ((unsigned) 2*BN_num_bytes(paillier_N) < byte_len))
+  {
+    return ;
+  }
+
+  uint8_t *read_bytes = *bytes;
+  
+  scalar_from_bytes(ciphertext, &read_bytes, byte_len, 1);
+  
+  int res = scalar_coprime(ciphertext, paillier_N);
+  if (!res)
+  {
+    scalar_set_ul(ciphertext, 1);
+    return ;
+  }
+  
+  assert(read_bytes == *bytes + byte_len);
+
+  if (move_to_end) *bytes = read_bytes;
+}
