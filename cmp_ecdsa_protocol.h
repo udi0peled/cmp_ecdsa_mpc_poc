@@ -120,10 +120,10 @@ typedef struct
   gr_elem_t *reshare_public_X_k;
   
   // ZKP data
-  gr_elem_t                   *commited_A_k;
-  zkp_schnorr_proof_t         **psi_sch_k;
-  zkp_paillier_blum_modulus_t *psi_mod;
-  zkp_ring_pedersen_param_t   *psi_rped;
+  gr_elem_t                         *commited_A_k;
+  zkp_schnorr_proof_t               **psi_sch_k;
+  zkp_paillier_blum_modulus_proof_t *psi_mod;
+  zkp_ring_pedersen_param_proof_t   *psi_rped;
 
   // Echo broadcast and random oracle data seed
   hash_chunk rho;
@@ -148,11 +148,11 @@ typedef struct
   gr_elem_t *reshare_public_X_j;
   
   // All ZKP
-  scalar_t                    *tau_j;
-  gr_elem_t                   *commited_A_j;
-  zkp_schnorr_proof_t         **psi_sch_j;
-  zkp_paillier_blum_modulus_t *psi_mod;
-  zkp_ring_pedersen_param_t   *psi_rped;
+  scalar_t                          *tau_j;
+  gr_elem_t                         *commited_A_j;
+  zkp_schnorr_proof_t               **psi_sch_j;
+  zkp_paillier_blum_modulus_proof_t *psi_mod;
+  zkp_ring_pedersen_param_proof_t   *psi_rped;
 
   // Echo broadcast and random oracle data seed
   hash_chunk combined_rho;
@@ -185,11 +185,11 @@ typedef struct
   gr_elem_t Delta;
   gr_elem_t Gamma;
 
-  zkp_encryption_in_range_t                 *psi_enc;
-  zkp_operation_paillier_commitment_range_t *psi_affp;
-  zkp_operation_group_commitment_range_t    *psi_affg;
-  zkp_group_vs_paillier_range_t             *psi_logG;
-  zkp_group_vs_paillier_range_t             *psi_logK;
+  zkp_encryption_in_range_proof_t        *psi_enc;
+  zkp_oper_paillier_commit_range_proof_t *psi_affp;
+  zkp_oper_group_commit_range_proof_t    *psi_affg;
+  zkp_group_vs_paillier_range_proof_t    *psi_logG;
+  zkp_group_vs_paillier_range_proof_t    *psi_logK;
 
   hash_chunk echo_broadcast;
 
@@ -221,11 +221,11 @@ typedef struct
   gr_elem_t Gamma;
   gr_elem_t combined_Gamma;
 
-  zkp_encryption_in_range_t                 **psi_enc_j;
-  zkp_operation_paillier_commitment_range_t **psi_affp_j;
-  zkp_operation_group_commitment_range_t    **psi_affg_j;
-  zkp_group_vs_paillier_range_t             **psi_logG_j;
-  zkp_group_vs_paillier_range_t             **psi_logK_j;
+  zkp_encryption_in_range_proof_t        **psi_enc_j;
+  zkp_oper_paillier_commit_range_proof_t **psi_affp_j;
+  zkp_oper_group_commit_range_proof_t    **psi_affg_j;
+  zkp_group_vs_paillier_range_proof_t    **psi_logG_j;
+  zkp_group_vs_paillier_range_proof_t    **psi_logK_j;
 
   uint8_t *echo_broadcast;
 
@@ -267,8 +267,8 @@ typedef struct cmp_party_t
 
   // Temporary data for relevant phase
   cmp_key_generation_data_t *key_generation_data;
-  cmp_refresh_data_t    *refresh_data;
-  cmp_presign_data_t          *presign_data;
+  cmp_refresh_data_t        *refresh_data;
+  cmp_presign_data_t        *presign_data;
 
   // Generated signature share
   gr_elem_t R;

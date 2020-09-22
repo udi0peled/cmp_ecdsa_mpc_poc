@@ -24,7 +24,7 @@ void  zkp_schnorr_commit (gr_elem_t commited_A, scalar_t alpha, const zkp_schnor
   group_operation(commited_A, NULL, public->g, alpha, public->G);
 }
 
-void zkp_schnoor_challenge(scalar_t e, const zkp_schnorr_public_t *public, const zkp_schnorr_proof_t *proof, const zkp_aux_info_t *aux)
+void zkp_schnoor_challenge(scalar_t e, const zkp_schnorr_proof_t *proof, const zkp_schnorr_public_t *public, const zkp_aux_info_t *aux)
 {
   uint64_t fs_data_len = aux->info_len + 3*GROUP_ELEMENT_BYTES;
   uint8_t *fs_data = malloc(fs_data_len);
@@ -43,14 +43,14 @@ void zkp_schnoor_challenge(scalar_t e, const zkp_schnorr_public_t *public, const
   free(fs_data);
 }
 
-void  zkp_schnorr_prove (zkp_schnorr_proof_t *proof, const zkp_schnorr_public_t *public, const scalar_t alpha, const zkp_schnorr_secret_t *secret, const zkp_aux_info_t *aux)
+void  zkp_schnorr_prove (zkp_schnorr_proof_t *proof, const scalar_t alpha, const zkp_schnorr_secret_t *secret, const zkp_schnorr_public_t *public, const zkp_aux_info_t *aux)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();
   scalar_t e = scalar_new();
 
   group_operation(proof->A, NULL, public->g, alpha, public->G);
 
-  zkp_schnoor_challenge(e, public, proof, aux);
+  zkp_schnoor_challenge(e, proof, public, aux);
 
   BN_mod_mul(proof->z, e, secret->x, ec_group_order(public->G), bn_ctx);
   BN_mod_add(proof->z, proof->z, alpha, ec_group_order(public->G), bn_ctx);
@@ -59,10 +59,10 @@ void  zkp_schnorr_prove (zkp_schnorr_proof_t *proof, const zkp_schnorr_public_t 
   BN_CTX_free(bn_ctx);
 }
 
-int   zkp_schnorr_verify (const zkp_schnorr_public_t *public, const zkp_schnorr_proof_t *proof, const zkp_aux_info_t *aux)
+int   zkp_schnorr_verify (const zkp_schnorr_proof_t *proof, const zkp_schnorr_public_t *public, const zkp_aux_info_t *aux)
 {
   scalar_t e = scalar_new();
-  zkp_schnoor_challenge(e, public, proof, aux);
+  zkp_schnoor_challenge(e, proof, public, aux);
 
   gr_elem_t lhs_value = group_elem_new(public->G);
   gr_elem_t rhs_value = group_elem_new(public->G);

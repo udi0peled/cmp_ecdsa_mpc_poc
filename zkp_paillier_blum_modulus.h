@@ -22,24 +22,20 @@
 
 typedef struct
 {
-  paillier_public_key_t *public;        // public
-  paillier_private_key_t *private;      // secret
+  scalar_t w;
+  scalar_t x[STATISTICAL_SECURITY];
+  scalar_t z[STATISTICAL_SECURITY];
+  uint8_t a[STATISTICAL_SECURITY];
+  uint8_t b[STATISTICAL_SECURITY];
 
-  struct {
-    scalar_t w;
-    scalar_t x[STATISTICAL_SECURITY];
-    scalar_t z[STATISTICAL_SECURITY];
-    uint8_t a[STATISTICAL_SECURITY];
-    uint8_t b[STATISTICAL_SECURITY];
-  } proof;
-} zkp_paillier_blum_modulus_t;
+} zkp_paillier_blum_modulus_proof_t;
 
-zkp_paillier_blum_modulus_t *
+zkp_paillier_blum_modulus_proof_t *
      zkp_paillier_blum_new              ();
-void zkp_paillier_blum_free             (zkp_paillier_blum_modulus_t *zkp);
-void zkp_paillier_blum_prove            (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
-int  zkp_paillier_blum_verify           (zkp_paillier_blum_modulus_t *zkp, const zkp_aux_info_t *aux);
-void zkp_paillier_blum_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_paillier_blum_modulus_t *zkp, int move_to_end);
-void zkp_paillier_blum_proof_from_bytes (zkp_paillier_blum_modulus_t *zkp, uint8_t **bytes, uint64_t *byte_len, int move_to_end);
+void zkp_paillier_blum_free             (zkp_paillier_blum_modulus_proof_t *proof);
+void zkp_paillier_blum_prove            (zkp_paillier_blum_modulus_proof_t *proof, const paillier_private_key_t *private, const zkp_aux_info_t *aux);
+int  zkp_paillier_blum_verify           (zkp_paillier_blum_modulus_proof_t *proof, const paillier_public_key_t *public, const zkp_aux_info_t *aux);
+void zkp_paillier_blum_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_paillier_blum_modulus_proof_t *proof, int move_to_end);
+void zkp_paillier_blum_proof_from_bytes (zkp_paillier_blum_modulus_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, int move_to_end);
 
 #endif

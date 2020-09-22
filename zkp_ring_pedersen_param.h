@@ -26,21 +26,17 @@
 
 typedef struct
 {
-  ring_pedersen_public_t *rped_pub;
-  ring_pedersen_private_t *secret;
+  scalar_t A[STATISTICAL_SECURITY];
+  scalar_t z[STATISTICAL_SECURITY];
 
-  struct {
-    scalar_t A[STATISTICAL_SECURITY];
-    scalar_t z[STATISTICAL_SECURITY];
-  } proof;
-} zkp_ring_pedersen_param_t;
+} zkp_ring_pedersen_param_proof_t;
 
-zkp_ring_pedersen_param_t *
+zkp_ring_pedersen_param_proof_t *
      zkp_ring_pedersen_param_new              ();
-void zkp_ring_pedersen_param_free             (zkp_ring_pedersen_param_t *zkp);
-void zkp_ring_pedersen_param_prove            (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
-int  zkp_ring_pedersen_param_verify           (zkp_ring_pedersen_param_t *zkp, const zkp_aux_info_t *aux);
-void zkp_ring_pedersen_param_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_ring_pedersen_param_t *zkp, int move_to_end);
-void zkp_ring_pedersen_param_proof_from_bytes (zkp_ring_pedersen_param_t *zkp, uint8_t **bytes, uint64_t *byte_len, int move_to_end);
+void zkp_ring_pedersen_param_free             (zkp_ring_pedersen_param_proof_t *proof);
+void zkp_ring_pedersen_param_prove            (zkp_ring_pedersen_param_proof_t *proof, const ring_pedersen_private_t *private, const zkp_aux_info_t *aux);
+int  zkp_ring_pedersen_param_verify           (const zkp_ring_pedersen_param_proof_t *proof, const ring_pedersen_public_t *public, const zkp_aux_info_t *aux);
+void zkp_ring_pedersen_param_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_ring_pedersen_param_proof_t *proof, int move_to_end);
+void zkp_ring_pedersen_param_proof_from_bytes (zkp_ring_pedersen_param_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, int move_to_end);
 
 #endif

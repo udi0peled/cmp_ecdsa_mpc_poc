@@ -66,7 +66,7 @@ zkp_operation_paillier_commitment_range.o: zkp_operation_paillier_commitment_ran
 	@$(CC) $(App_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-primitives.o: algebraic_elements.o paillier_cryptosystem.o ring_pedersen_parameters.o  zkp_common.o zkp_paillier_blum_modulus.o zkp_ring_pedersen_param.o zkp_schnorr.o zkp_encryption_in_range.o zkp_group_vs_paillier_range.o zkp_operation_group_commitment_range.o zkp_operation_paillier_commitment_range.o
+primitives.o: algebraic_elements.o paillier_cryptosystem.o ring_pedersen_parameters.o  zkp_common.o zkp_paillier_blum_modulus.o zkp_ring_pedersen_param.o zkp_schnorr.o zkp_encryption_in_range.o zkp_group_vs_paillier_range.o zkp_operation_paillier_commitment_range.o zkp_operation_group_commitment_range.o
 	@$(LD) -relocatable $^ -o $@
 	@echo "LINK =>  $@"
 

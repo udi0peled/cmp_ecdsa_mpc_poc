@@ -214,8 +214,8 @@ int main(int argc, char* argv[])
       // printf("ZKP_RING_PEDERSEN_PARAM_PROOF_BYTES = %lu\n", zkp_ring_pedersen_param_proof_bytes());
       // printf("ZKP_SCHNORR_PROOF_BYTES = %lu\n", zkp_schnorr_proof_bytes());
       // printf("ZKP_GROUP_VS_PAILLIER_PROOF_BYTES = %lu\n", zkp_group_vs_paillier_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES));
-      // printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_group_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
-      // printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_operation_paillier_commitment_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
+      // printf("ZKP_OPERATION_GROUP_COMMITMENT_PROOF_BYTES = %lu\n", zkp_oper_group_commit_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
+      // printf("ZKP_OPERATION_PAILLIER_COMMITMENT_PROOF_BYTES = %lu\n", zkp_oper_paillier_commit_range_proof_bytes(CALIGRAPHIC_I_ZKP_RANGE_BYTES, CALIGRAPHIC_J_ZKP_RANGE_BYTES));
 
       printf("\n### Party %lu executing protocol, out of %lu parties\n", party_index, num_parties);
       

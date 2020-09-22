@@ -285,24 +285,24 @@ void test_zkp_schnorr()
   scalar_t alpha = scalar_new();
 
   zkp_schnorr_commit(zkp_proof->A, alpha, &zkp_public);
-  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
-  printf("# 1 == %d : valid\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
+  zkp_schnorr_prove(zkp_proof, alpha, &zkp_secret, &zkp_public, &aux);
+  printf("# 1 == %d : valid\n", zkp_schnorr_verify(zkp_proof, &zkp_public, &aux));
 
   BN_add_word(alpha,1);
-  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
-  printf("# 1 == %d : alpha changed\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
+  zkp_schnorr_prove(zkp_proof, alpha, &zkp_secret, &zkp_public, &aux);
+  printf("# 1 == %d : alpha changed\n", zkp_schnorr_verify(zkp_proof, &zkp_public, &aux));
 
   BN_add_word(zkp_secret.x,1);
-  zkp_schnorr_prove(zkp_proof, &zkp_public, alpha, &zkp_secret, &aux);
-  printf("# 0 == %d : wrond secret.x\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
+  zkp_schnorr_prove(zkp_proof, alpha, &zkp_secret, &zkp_public, &aux);
+  printf("# 0 == %d : wrond secret.x\n", zkp_schnorr_verify(zkp_proof, &zkp_public, &aux));
 
   BN_sub_word(zkp_secret.x,1);
   BN_add_word(zkp_proof->z, 1);
-  printf("# 0 == %d : wrong z\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
+  printf("# 0 == %d : wrong z\n", zkp_schnorr_verify(zkp_proof, &zkp_public, &aux));
 
   aux.info = malloc(1);
   aux.info_len = 1;
-  printf("# 0 == %d : wrong aux\n", zkp_schnorr_verify(&zkp_public, zkp_proof, &aux));
+  printf("# 0 == %d : wrong aux\n", zkp_schnorr_verify(zkp_proof, &zkp_public, &aux));
   
   free(aux.info);
   scalar_free(alpha);
@@ -320,56 +320,60 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
 
   zkp_aux_info_t *aux = zkp_aux_info_new(1, &k_range_bytes); // just some value
 
-  zkp_encryption_in_range_t *zkp = zkp_encryption_in_range_new();
+  zkp_encryption_in_range_proof_t *proof = zkp_encryption_in_range_new();
+  zkp_encryption_in_range_public_t public;
+  zkp_encryption_in_range_secret_t secret;
+  
+  ec_group_t G = ec_group_new();
 
-  zkp->public.G = ec_group_new();
-  zkp->public.paillier_pub = paillier_pub;
-  zkp->public.rped_pub = rped_pub;
-  zkp->public.K = scalar_new();
-  zkp->public.k_range_bytes = k_range_bytes;
+  public.challenge_modulus = ec_group_order(G);
+  public.paillier_pub = paillier_pub;
+  public.rped_pub = rped_pub;
+  public.K = scalar_new();
+  public.k_range_bytes = k_range_bytes;
 
-  zkp->secret.k = scalar_new();
-  zkp->secret.rho = scalar_new();
+  secret.k = scalar_new();
+  secret.rho = scalar_new();
 
   scalar_t sample_range = scalar_new();
-  scalar_set_power_of_2(sample_range, zkp->public.k_range_bytes);
-  scalar_sample_in_range(zkp->secret.k, sample_range, 0);
+  scalar_set_power_of_2(sample_range, public.k_range_bytes);
+  scalar_sample_in_range(secret.k, sample_range, 0);
 
-  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
-  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
+  paillier_encryption_sample(secret.rho, paillier_pub);
+  paillier_encryption_encrypt(public.K, secret.k, secret.rho, paillier_pub);
 
-  printBIGNUM("k = ", zkp->secret.k, "\n");
-  printBIGNUM("rho = ", zkp->secret.rho, "\n");
+  printBIGNUM("k = ", secret.k, "\n");
+  printBIGNUM("rho = ", secret.rho, "\n");
 
-  printBIGNUM("N0 = ", zkp->public.paillier_pub->N, "\n");
-  printBIGNUM("Nhat = ", zkp->public.rped_pub->N, "\n");
-  printBIGNUM("s = ", zkp->public.rped_pub->s, "\n");
-  printBIGNUM("t = ", zkp->public.rped_pub->t, "\n");
-  printBIGNUM("K = ", zkp->public.K, "\n");
+  printBIGNUM("N0 = ", public.paillier_pub->N, "\n");
+  printBIGNUM("Nhat = ", public.rped_pub->N, "\n");
+  printBIGNUM("s = ", public.rped_pub->s, "\n");
+  printBIGNUM("t = ", public.rped_pub->t, "\n");
+  printBIGNUM("K = ", public.K, "\n");
 
-  zkp_encryption_in_range_prove(zkp, aux);
-  printf("# 1 == %d : valid \n", zkp_encryption_in_range_verify(zkp, aux));
+  zkp_encryption_in_range_prove(proof, &secret, &public, aux);
+  printf("# 1 == %d : valid \n", zkp_encryption_in_range_verify(proof, &public, aux));
 
-  BN_add_word(zkp->secret.k, 1);
-  zkp_encryption_in_range_prove(zkp, aux);
-  printf("# 0 == %d : wrong secret.k\n", zkp_encryption_in_range_verify(zkp, aux));
+  BN_add_word(secret.k, 1);
+  zkp_encryption_in_range_prove(proof, &secret, &public, aux);
+  printf("# 0 == %d : wrong secret.k\n", zkp_encryption_in_range_verify(proof, &public, aux));
 
-  BN_sub_word(zkp->secret.k, 1);
-  BN_add_word(zkp->secret.rho, 1);
-  zkp_encryption_in_range_prove(zkp, aux);
-  printf("# 0 == %d : wrong secret.rho\n", zkp_encryption_in_range_verify(zkp, aux));
+  BN_sub_word(secret.k, 1);
+  BN_add_word(secret.rho, 1);
+  zkp_encryption_in_range_prove(proof, &secret, &public, aux);
+  printf("# 0 == %d : wrong secret.rho\n", zkp_encryption_in_range_verify(proof, &public, aux));
 
   
   scalar_set_power_of_2(sample_range, 8*k_range_bytes + 8*EPS_ZKP_SLACK_PARAMETER_BYTES );
-  scalar_add(zkp->secret.k, zkp->secret.k, sample_range, zkp->public.paillier_pub->N);
+  scalar_add(secret.k, secret.k, sample_range, public.paillier_pub->N);
   
-  paillier_encryption_sample(zkp->secret.rho, paillier_pub);
-  paillier_encryption_encrypt(zkp->public.K, zkp->secret.k, zkp->secret.rho, paillier_pub);
-  zkp_encryption_in_range_prove(zkp, aux);
-  printf("# 0 == %d : too big secret\n", zkp_encryption_in_range_verify(zkp, aux));
+  paillier_encryption_sample(secret.rho, paillier_pub);
+  paillier_encryption_encrypt(public.K, secret.k, secret.rho, paillier_pub);
+  zkp_encryption_in_range_prove(proof, &secret, &public, aux);
+  printf("# 0 == %d : too big secret\n", zkp_encryption_in_range_verify(proof, &public, aux));
 
   zkp_aux_info_update(aux, 1, NULL, 1);
-  printf("# 0 == %d : wrong aux\n", zkp_encryption_in_range_verify(zkp, aux));
+  printf("# 0 == %d : wrong aux\n", zkp_encryption_in_range_verify(proof, &public, aux));
 
   zkp_aux_info_update(aux, 1, NULL, 0);
   
@@ -379,25 +383,26 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
   zkp_encryption_in_range_proof_to_bytes(NULL, &zkp_bytelen, NULL, k_range_bytes, 0);
 
   uint8_t *zkp_bytes = malloc(zkp_bytelen);
-  zkp_encryption_in_range_proof_to_bytes(&zkp_bytes, &zkp_bytelen, zkp, k_range_bytes, 0);
+  zkp_encryption_in_range_proof_to_bytes(&zkp_bytes, &zkp_bytelen, proof, k_range_bytes, 0);
 
-  zkp_encryption_in_range_t *zkp_enc_copy = zkp_encryption_in_range_new();
-  zkp_encryption_in_range_proof_from_bytes(zkp_enc_copy, &zkp_bytes, &zkp_bytelen, k_range_bytes, 0);
+  zkp_encryption_in_range_proof_t *proof_enc_copy = zkp_encryption_in_range_new();
+  zkp_encryption_in_range_proof_from_bytes(proof_enc_copy, &zkp_bytes, &zkp_bytelen, k_range_bytes, 0);
 
-  printf("same A %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.A,     zkp->proof.A),   BN_num_bits(zkp_enc_copy->proof.A),   BN_num_bits(zkp->proof.A));
-  printf("same C %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.C,     zkp->proof.C),   BN_num_bits(zkp_enc_copy->proof.C),   BN_num_bits(zkp->proof.C));
-  printf("same S %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.S,     zkp->proof.S),   BN_num_bits(zkp_enc_copy->proof.S),   BN_num_bits(zkp->proof.S));
-  printf("same z_1 %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.z_1, zkp->proof.z_1), BN_num_bits(zkp_enc_copy->proof.z_1), BN_num_bits(zkp->proof.z_1));
-  printf("same z_2 %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.z_2, zkp->proof.z_2), BN_num_bits(zkp_enc_copy->proof.z_2), BN_num_bits(zkp->proof.z_2));
-  printf("same z_3 %d [%d, %d]\n", scalar_equal(zkp_enc_copy->proof.z_3, zkp->proof.z_3), BN_num_bits(zkp_enc_copy->proof.z_3), BN_num_bits(zkp->proof.z_3));
+  printf("same A %d [%d, %d]\n", scalar_equal(proof_enc_copy->A,     proof->A),   BN_num_bits(proof_enc_copy->A),   BN_num_bits(proof->A));
+  printf("same C %d [%d, %d]\n", scalar_equal(proof_enc_copy->C,     proof->C),   BN_num_bits(proof_enc_copy->C),   BN_num_bits(proof->C));
+  printf("same S %d [%d, %d]\n", scalar_equal(proof_enc_copy->S,     proof->S),   BN_num_bits(proof_enc_copy->S),   BN_num_bits(proof->S));
+  printf("same z_1 %d [%d, %d]\n", scalar_equal(proof_enc_copy->z_1, proof->z_1), BN_num_bits(proof_enc_copy->z_1), BN_num_bits(proof->z_1));
+  printf("same z_2 %d [%d, %d]\n", scalar_equal(proof_enc_copy->z_2, proof->z_2), BN_num_bits(proof_enc_copy->z_2), BN_num_bits(proof->z_2));
+  printf("same z_3 %d [%d, %d]\n", scalar_equal(proof_enc_copy->z_3, proof->z_3), BN_num_bits(proof_enc_copy->z_3), BN_num_bits(proof->z_3));
 
   zkp_aux_info_free(aux);
   scalar_free(sample_range);
-  scalar_free(zkp->secret.k);
-  scalar_free(zkp->secret.rho);
-  scalar_free(zkp->public.K);
-  ec_group_free(zkp->public.G);
-  zkp_encryption_in_range_free(zkp);
+  scalar_free(secret.k);
+  scalar_free(secret.rho);
+  scalar_free(public.K);
+  ec_group_free(G);
+  zkp_encryption_in_range_free(proof);
+  zkp_encryption_in_range_free(proof_enc_copy);
 }
 
 /**
