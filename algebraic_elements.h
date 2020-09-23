@@ -41,6 +41,7 @@ void      scalar_set_power_of_2    (scalar_t num, uint64_t two_exp);
 // If byte_len too small, does nothing
 void      scalar_to_bytes          (uint8_t **bytes, uint64_t byte_len, const scalar_t num, int move_to_end);
 void      scalar_from_bytes        (scalar_t num, uint8_t **bytes, uint64_t byte_len, int move_to_end);
+void      scalar_coprime_from_bytes(scalar_t num, uint8_t **bytes, uint64_t byte_len, const scalar_t modulus, int move_to_end);
 int       scalar_equal             (const scalar_t a, const scalar_t b);
 int       scalar_bitlength         (const scalar_t a);
 void      scalar_gcd               (scalar_t result, const scalar_t first, const scalar_t second);

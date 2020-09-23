@@ -28,6 +28,6 @@ void test_group_elements();
 void test_zkp_schnorr();
 void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pedersen_public_t *rped_pub, uint64_t k_range_bytes);
 
-void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values);
+void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values, int print_secrets);
 
 #endif

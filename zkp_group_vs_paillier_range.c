@@ -205,7 +205,7 @@ void zkp_group_vs_paillier_range_proof_to_bytes(uint8_t **bytes, uint64_t *byte_
 }
 
 
-void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, const ec_group_t G, int move_to_end)
+void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, const scalar_t N0, const ec_group_t G, int move_to_end)
 { 
   uint64_t needed_byte_len;
   zkp_group_vs_paillier_range_proof_to_bytes(NULL, &needed_byte_len, NULL, x_range_bytes, G, 0);
@@ -222,7 +222,7 @@ void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_pr
   scalar_t range = scalar_new();
 
   scalar_from_bytes(proof->S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
-  scalar_from_bytes(proof->A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_coprime_from_bytes(proof->A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, N0, 1);
   group_elem_from_bytes(proof->Y, &read_bytes, GROUP_ELEMENT_BYTES, G, 1);
   scalar_from_bytes(proof->D, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   
@@ -232,7 +232,7 @@ void zkp_group_vs_paillier_range_proof_from_bytes(zkp_group_vs_paillier_range_pr
   scalar_from_bytes(proof->z_1, &read_bytes, bytelen, 1);
   scalar_make_signed(proof->z_1, range);
 
-  scalar_from_bytes(proof->z_2, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_coprime_from_bytes(proof->z_2, &read_bytes, PAILLIER_MODULUS_BYTES, N0, 1);
 
   // Signed z_3 from unsigned bytes
   bytelen = RING_PED_MODULUS_BYTES + x_range_bytes + EPS_ZKP_SLACK_PARAMETER_BYTES;

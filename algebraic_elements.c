@@ -25,6 +25,12 @@ void scalar_from_bytes (scalar_t num, uint8_t **bytes, uint64_t byte_len, int mo
   if (move_to_end) *bytes += byte_len;
 }
 
+void scalar_coprime_from_bytes (scalar_t num, uint8_t **bytes, uint64_t byte_len, const scalar_t modulus, int move_to_end)
+{  
+  scalar_from_bytes(num, bytes, byte_len, move_to_end);
+  if (!scalar_coprime(num, modulus)) scalar_set_ul(num, 1);
+}
+
 void scalar_add (scalar_t result, const scalar_t first, const scalar_t second, const scalar_t modulus)
 {
   BN_CTX *bn_ctx = BN_CTX_secure_new();

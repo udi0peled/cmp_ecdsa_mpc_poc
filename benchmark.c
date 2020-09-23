@@ -181,7 +181,7 @@ void time_bn_ctx(uint64_t reps)
 
 int main(int argc, char* argv[])
 { 
-  int print_secrets = 0;
+  uint64_t print_values = 0;
   uint64_t num_parties = 2;
   uint64_t party_index;
 
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
       if (argc >= 4)
       {
         num_parties = strtoul(argv[3], NULL, 10);
-        if (argc >= 5) print_secrets = strcmp(argv[4], "0") != 0;
+        if (argc >= 5) print_values = strtoul(argv[4], NULL, 10);
       }
 
       printf("PAILLIER_MODULUS_BYTES = %u\n", PAILLIER_MODULUS_BYTES);
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 
       printf("\n### Party %lu executing protocol, out of %lu parties\n", party_index, num_parties);
       
-      test_protocol(party_index, num_parties, print_secrets);
+      test_protocol(party_index, num_parties, print_values != 0, print_values > 1);
 
       return 0;
     }
@@ -286,7 +286,7 @@ int main(int argc, char* argv[])
 
 USAGE:
   printf("\nUsage options:\n");
-  printf("%s cmp <party_index> <num_parties (%lu)> [print_secrets (%d)]\n", argv[0], num_parties, print_secrets); 
+  printf("%s cmp <party_index> <num_parties (%lu)> [print_values (%lu)]\n", argv[0], num_parties, print_values); 
   printf("%s paillier <modulus_bits (%lu)>\n", argv[0], modulus_bits); 
   //printf("%s\n zkp <paillier_modulus_bits (%ul)>\n", argv[0], modulus_bits); 
 

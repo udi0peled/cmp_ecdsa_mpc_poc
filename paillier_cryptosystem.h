@@ -57,6 +57,5 @@ void paillier_encryption_decrypt          (scalar_t plaintext, const scalar_t ci
 void paillier_encryption_homomorphic      (scalar_t new_cipher, const scalar_t ciphertext, const scalar_t factor, const scalar_t add_cipher, const paillier_public_key_t *pub);       
 void paillier_public_to_bytes             (uint8_t **bytes, uint64_t *byte_len, const paillier_public_key_t *pub, uint64_t paillier_modulus_bytes, int move_to_end);
 void paillier_public_from_bytes           (paillier_public_key_t *pub, uint8_t **bytes, uint64_t *byte_len, uint64_t paillier_modulus_bytes, int move_to_end);
-void paillier_ciphertext_from_bytes       (scalar_t ciphertext, uint8_t **bytes, uint64_t byte_len, const scalar_t paillier_N, int move_to_end);
 
 #endif

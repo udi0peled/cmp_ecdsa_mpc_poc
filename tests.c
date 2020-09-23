@@ -386,7 +386,7 @@ void test_zkp_encryption_in_range(paillier_public_key_t *paillier_pub, ring_pede
   zkp_encryption_in_range_proof_to_bytes(&zkp_bytes, &zkp_bytelen, proof, k_range_bytes, 0);
 
   zkp_encryption_in_range_proof_t *proof_enc_copy = zkp_encryption_in_range_new();
-  zkp_encryption_in_range_proof_from_bytes(proof_enc_copy, &zkp_bytes, &zkp_bytelen, k_range_bytes, 0);
+  zkp_encryption_in_range_proof_from_bytes(proof_enc_copy, &zkp_bytes, &zkp_bytelen, k_range_bytes, paillier_pub->N, 0);
 
   printf("same A %d [%d, %d]\n", scalar_equal(proof_enc_copy->A,     proof->A),   BN_num_bits(proof_enc_copy->A),   BN_num_bits(proof->A));
   printf("same C %d [%d, %d]\n", scalar_equal(proof_enc_copy->C,     proof->C),   BN_num_bits(proof_enc_copy->C),   BN_num_bits(proof->C));
@@ -527,11 +527,12 @@ void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
   group_elem_free(pubkey);
 }
 
-int PRINT_VALUES = 0;
+int PRINT_VALUES;
 int PRINT_SECRETS;
 
-void test_protocol(uint64_t party_index, uint64_t num_parties, int print_secrets)
+void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values, int print_secrets)
 {
+  PRINT_VALUES = print_values;
   PRINT_SECRETS = print_secrets;
   
   hash_chunk  sid = "Fireblocks";

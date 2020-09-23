@@ -297,7 +297,7 @@ void zkp_oper_paillier_commit_range_proof_to_bytes(uint8_t **bytes, uint64_t *by
   if (move_to_end) *bytes = set_bytes;
 }
 
-void zkp_oper_paillier_commit_range_proof_from_bytes(zkp_oper_paillier_commit_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, int move_to_end)
+void zkp_oper_paillier_commit_range_proof_from_bytes(zkp_oper_paillier_commit_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t x_range_bytes, uint64_t y_range_bytes, const scalar_t N0, const scalar_t N1, int move_to_end)
 {
   uint64_t needed_byte_len;
   zkp_oper_paillier_commit_range_proof_to_bytes(NULL, &needed_byte_len, NULL, x_range_bytes, y_range_bytes, 0);
@@ -312,9 +312,9 @@ void zkp_oper_paillier_commit_range_proof_from_bytes(zkp_oper_paillier_commit_ra
   uint64_t bytelen;
   scalar_t range = scalar_new();
  
-  scalar_from_bytes(proof->A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
-  scalar_from_bytes(proof->B_x, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
-  scalar_from_bytes(proof->B_y, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, 1);
+  scalar_coprime_from_bytes(proof->A, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, N0, 1);
+  scalar_coprime_from_bytes(proof->B_x, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, N1, 1);
+  scalar_coprime_from_bytes(proof->B_y, &read_bytes, 2 * PAILLIER_MODULUS_BYTES, N1, 1);
   scalar_from_bytes(proof->E, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(proof->F, &read_bytes, RING_PED_MODULUS_BYTES, 1);
   scalar_from_bytes(proof->S, &read_bytes, RING_PED_MODULUS_BYTES, 1);
@@ -344,9 +344,9 @@ void zkp_oper_paillier_commit_range_proof_from_bytes(zkp_oper_paillier_commit_ra
   scalar_from_bytes(proof->z_4, &read_bytes, bytelen, 1);
   scalar_make_signed(proof->z_4, range);
 
-  scalar_from_bytes(proof->w, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
-  scalar_from_bytes(proof->w_x, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
-  scalar_from_bytes(proof->w_y, &read_bytes, PAILLIER_MODULUS_BYTES, 1);
+  scalar_coprime_from_bytes(proof->w, &read_bytes, PAILLIER_MODULUS_BYTES, N0, 1);
+  scalar_coprime_from_bytes(proof->w_x, &read_bytes, PAILLIER_MODULUS_BYTES, N1, 1);
+  scalar_coprime_from_bytes(proof->w_y, &read_bytes, PAILLIER_MODULUS_BYTES, N1, 1);
 
   scalar_free(range);
 

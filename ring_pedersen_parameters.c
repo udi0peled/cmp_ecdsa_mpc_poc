@@ -164,8 +164,8 @@ void ring_pedersen_public_from_bytes (ring_pedersen_public_t *rped_pub, uint8_t 
   uint8_t *read_bytes = *bytes;
   
   scalar_from_bytes(rped_pub->N, &read_bytes, rped_modulus_bytes, 1);
-  scalar_from_bytes(rped_pub->s, &read_bytes, rped_modulus_bytes, 1);
-  scalar_from_bytes(rped_pub->t, &read_bytes, rped_modulus_bytes, 1);
+  scalar_coprime_from_bytes(rped_pub->s, &read_bytes, rped_modulus_bytes, rped_pub->N, 1);
+  scalar_coprime_from_bytes(rped_pub->t, &read_bytes, rped_modulus_bytes, rped_pub->N, 1);
 
   assert(read_bytes == *bytes + needed_byte_len);
   *byte_len = needed_byte_len;

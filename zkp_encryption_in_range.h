@@ -52,6 +52,6 @@ void zkp_encryption_in_range_free             (zkp_encryption_in_range_proof_t *
 void zkp_encryption_in_range_prove            (zkp_encryption_in_range_proof_t *proof, const zkp_encryption_in_range_secret_t *secret, const zkp_encryption_in_range_public_t *public, const zkp_aux_info_t *aux);
 int  zkp_encryption_in_range_verify           (const zkp_encryption_in_range_proof_t *proof, const zkp_encryption_in_range_public_t *public, const zkp_aux_info_t *aux);
 void zkp_encryption_in_range_proof_to_bytes   (uint8_t **bytes, uint64_t *byte_len, const zkp_encryption_in_range_proof_t *proof, uint64_t k_range_bytes, int move_to_end);
-void zkp_encryption_in_range_proof_from_bytes (zkp_encryption_in_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t k_range_bytes, int move_to_end);
+void zkp_encryption_in_range_proof_from_bytes (zkp_encryption_in_range_proof_t *proof, uint8_t **bytes, uint64_t *byte_len, uint64_t k_range_bytes, const scalar_t N0, int move_to_end);
 
 #endif
