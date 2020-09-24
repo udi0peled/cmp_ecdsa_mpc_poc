@@ -1,7 +1,7 @@
 #include "primitives.h"
 #include "common.h"
 #include "tests.h"
-#include "cmp_ecdsa_protocol.h"
+#include "cmp_protocol.h"
 
 #include <assert.h>
 #include <time.h>

@@ -1,6 +1,6 @@
 #include <openssl/rand.h>
 #include "tests.h"
-#include "cmp_ecdsa_protocol.h"
+#include "cmp_protocol.h"
 
 void test_scalars(const scalar_t range, uint64_t range_byte_len)
 {
@@ -433,97 +433,82 @@ void execute_refresh_and_aux_info (cmp_party_t *party)
   cmp_refresh_aux_info_clean(party);
 }
 
-void get_public_key(gr_elem_t pubkey, cmp_party_t *parties[], uint64_t num_parties)
+void get_public_key(gr_elem_t pubkey, const cmp_party_t *party)
 {
-  gr_elem_t *pub = calloc(num_parties, sizeof(gr_elem_t));
-  for (uint64_t i = 0; i < num_parties; ++i)
-  {
-    pub[i] = group_elem_new(parties[i]->ec);
-    group_elem_copy(pub[i], parties[i]->public_X[0]);
-    for (uint64_t k = 1; k < parties[i]->num_parties; ++k)
-    { 
-      group_operation(pub[i], pub[i], parties[i]->public_X[k], NULL, parties[i]->ec);  
-    }
-    assert(group_elem_equal(pub[0], pub[i], parties[0]->ec));
+  group_operation(pubkey, NULL, NULL, NULL, party->ec);
+  for (uint64_t i = 0; i < party->num_parties; ++i)
+  { 
+    group_operation(pubkey, pubkey, party->public_X[i], NULL, party->ec);
   }
-  group_elem_copy(pubkey, pub[0]);
-
-  for (uint64_t i = 0; i < num_parties; ++i) group_elem_free(pub[i]);
-  free(pub);
 }
 
 void execute_presign (cmp_party_t *party)
 {
-  cmp_presign_init(party);
-  cmp_presign_round_1_exec(party);
-  cmp_presign_round_2_exec(party);
-  cmp_presign_round_3_exec(party);
-  cmp_presign_final_exec(party);
-  cmp_presign_clean(party);
+  cmp_ecdsa_presign_init(party);
+  cmp_ecdsa_presign_round_1_exec(party);
+  cmp_ecdsa_presign_round_2_exec(party);
+  cmp_ecdsa_presign_round_3_exec(party);
+  cmp_ecdsa_presign_final_exec(party);
+  cmp_ecdsa_presign_clean(party);
 }
 
-int signature_verify(const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
+int signature_verify( const cmp_party_t *party, const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
 {
-  ec_group_t ec    = ec_group_new();
-  gr_elem_t gen    = ec_group_generator(ec);
-  scalar_t ord     = ec_group_order(ec);
-  gr_elem_t result = group_elem_new(ec);
+  gr_elem_t result = group_elem_new(party->ec);
 
   scalar_t s_inv = scalar_new();
-  scalar_inv(s_inv, s, ord);
+  scalar_inv(s_inv, s, party->ec_order);
 
-  group_operation(result, NULL, gen, msg, ec);
-  group_operation(result, result, pubkey, r, ec);
-  group_operation(result, NULL, result, s_inv, ec);
+  group_operation(result, NULL, party->ec_gen, msg, party->ec);
+  group_operation(result, result, pubkey, r, party->ec);
+  group_operation(result, NULL, result, s_inv, party->ec);
 
   scalar_t project_x = scalar_new();
-  group_elem_get_x(project_x, result, ec, ord);
+  group_elem_get_x(project_x, result, party->ec, party->ec_order);
 
   int is_valid = scalar_equal(project_x, r);
 
   group_elem_free(result);
   scalar_free(s_inv);
   scalar_free(project_x);
-  ec_group_free(ec);
 
   return is_valid;
 }
 
-void execute_signing (cmp_party_t *parties[], uint64_t num_parties)
+void execute_signing (cmp_party_t *party)
 {
-  scalar_t *r     = calloc(num_parties, sizeof(scalar_t)); 
-  
   scalar_t s     = scalar_new();
+  scalar_t r     = scalar_new();
   scalar_t msg   = scalar_new();
-  scalar_t sigma = scalar_new();
   
-  scalar_sample_in_range(msg, parties[0]->ec_order, 0);
-  scalar_set_ul(s, 0);
-  for (uint64_t i = 0; i < num_parties; ++i)
-  {
-    r[i] = scalar_new();
-    //cmp_signature_share(r[i], sigma, parties[i], msg);
-    scalar_add(s, s, sigma, parties[i]->ec_order);
-    assert(scalar_equal(r[0], r[i]));
-  }
+  uint8_t *msg_bytes = party->sid;
+  scalar_from_bytes(msg, &msg_bytes, GROUP_ORDER_BYTES, 0);
 
   // Validate Signature
-  
-  gr_elem_t pubkey = group_elem_new(parties[0]->ec);
-  get_public_key(pubkey, parties, num_parties);
+
+  gr_elem_t pubkey = group_elem_new(party->ec);
+  get_public_key(pubkey, party);
+
+  cmp_ecdsa_signing_init(party);
+  cmp_ecdsa_signing_round_1_exec(party, msg);
+  cmp_ecdsa_signing_final_exec(r, s, party);
+  cmp_ecdsa_signing_clean(party);
 
   printBIGNUM("msg = ", msg, "\n");
-  printBIGNUM("r = ", r[0], "\n");
+  printBIGNUM("r = ", r, "\n");
   printBIGNUM("s = ", s, "\n");
-  printECPOINT("pubkey = ", pubkey, parties[0]->ec, "\n", 1);
+  printECPOINT("pubkey = ", pubkey, party->ec, "\n", 1);
 
-  assert(signature_verify(r[0], s, msg, pubkey));
+  assert(signature_verify(party, r, s, msg, pubkey));
 
-  for (uint64_t i = 0; i < num_parties; ++i) scalar_free(r[i]);
-  free(r);
+  printf("### Verified!\n");
+
+  scalar_add(msg, msg, msg, party->ec_order);
+  assert(signature_verify(party, r, s, msg, pubkey) == 0);
+
+  scalar_free(r);
   scalar_free(s);
   scalar_free(msg);
-  scalar_free(sigma);
   group_elem_free(pubkey);
 }
 
@@ -544,17 +529,17 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values,
   // Initialize Parties
   cmp_party_t *party = cmp_party_new(party_index, num_parties, party_ids, sid);
 
-  printf("\n\n# Key Generation\n\n");
+  printf("\n\n### Key Generation\n\n");
   execute_key_generation(party);
 
-  printf("\n\n# Refrsh and Auxliarty Information\n\n");
+  printf("\n\n### Refrsh and Auxliarty Information\n\n");
   execute_refresh_and_aux_info(party);
 
-  printf("\n\n# PreSign\n\n");
+  printf("\n\n### PreSign\n\n");
   execute_presign(party);
 
-  // printf("\n\n# Signing\n\n");
-  // execute_signing(parties, num_parties);
+  printf("\n\n### Signing\n\n");
+  execute_signing(party);
 
   cmp_party_free(party);
   free(party_ids);

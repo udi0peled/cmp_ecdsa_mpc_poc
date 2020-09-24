@@ -1,7 +1,7 @@
 /**
  * 
  *  Name:
- *  cmp_ecdsa_protocol
+ *  cmp_protocol
  *  
  *  Description:
  * 
@@ -134,6 +134,7 @@ typedef struct
 } cmp_refresh_payload_t;
 
 // Data generated (and partially sent) by party during phase
+
 typedef struct 
 {
   // Paillier and ring pedersen keys
@@ -170,7 +171,7 @@ typedef struct
 } cmp_refresh_data_t;
 
 /**
- *  Temporary data for presign phase
+ *  Temporary data for ecdsa presign phase
  */
 
 typedef struct 
@@ -194,7 +195,7 @@ typedef struct
   hash_chunk echo_broadcast;
 
   uint64_t run_time;
-} cmp_presign_payload_t;
+} cmp_ecdsa_presign_payload_t;
 
 
 typedef struct 
@@ -229,10 +230,76 @@ typedef struct
 
   uint8_t *echo_broadcast;
 
-  cmp_presign_payload_t **payload;
+  cmp_ecdsa_presign_payload_t **payload;
 
   uint64_t run_time;
-} cmp_presign_data_t;
+} cmp_ecdsa_presign_data_t;
+
+
+/**
+ *  Temporary data for ecdsa signing phase
+ */
+
+typedef struct
+{
+  scalar_t sigma;
+} cmp_signing_payload_t;
+
+typedef struct
+{
+  cmp_signing_payload_t **payload;
+  scalar_t sigma;
+  scalar_t r;
+} cmp_ecdsa_signing_data_t;
+
+
+/**
+ *  Temporary data for schnorr presign phase
+ */
+
+typedef struct 
+{
+  scalar_t  K;
+  gr_elem_t R;
+
+  zkp_encryption_in_range_proof_t     *psi_enc;
+  zkp_group_vs_paillier_range_proof_t *psi_logK;
+
+  hash_chunk echo_broadcast; 
+} cmp_schnorr_presign_payload_t;
+
+
+typedef struct 
+{
+  scalar_t  k;
+  scalar_t  rho;
+  scalar_t  K;
+  gr_elem_t R;
+
+  zkp_encryption_in_range_proof_t     **psi_enc_j;
+  zkp_group_vs_paillier_range_proof_t **psi_logK_j;
+
+  uint8_t *echo_broadcast;
+
+  cmp_schnorr_presign_payload_t **payload;
+} cmp_schnorr_presign_data_t;
+
+/**
+ *  Temporary data for schnorr signing phase
+ */
+
+typedef struct
+{
+  scalar_t sigma;
+} cmp_schnorr_signing_payload_t;
+
+typedef struct
+{
+  cmp_signing_payload_t **payload;
+  scalar_t sigma;
+  scalar_t r;
+} cmp_schnorr_signing_data_t;
+
 
 /**
  *  Long term data for party.
@@ -266,9 +333,12 @@ typedef struct cmp_party_t
   hash_chunk sid_hash;
 
   // Temporary data for relevant phase
-  cmp_key_generation_data_t *key_generation_data;
-  cmp_refresh_data_t        *refresh_data;
-  cmp_presign_data_t        *presign_data;
+  cmp_key_generation_data_t  *key_generation_data;
+  cmp_refresh_data_t         *refresh_data;
+  cmp_ecdsa_presign_data_t   *ecdsa_presign_data;
+  cmp_ecdsa_signing_data_t   *ecdsa_signing_data;
+  cmp_schnorr_presign_data_t *schnorr_presign_data;
+  cmp_schnorr_signing_data_t *schnorr_signing_data;
 
   // Generated signature share
   gr_elem_t R;
@@ -279,9 +349,8 @@ typedef struct cmp_party_t
   struct cmp_party_t **parties;
 } cmp_party_t;
 
-cmp_party_t *
-      cmp_party_new (uint64_t party_index, uint64_t num_parties, const uint64_t *parties_ids, const hash_chunk sid);
-void  cmp_party_free (cmp_party_t *party);
+cmp_party_t *cmp_party_new  (uint64_t party_index, uint64_t num_parties, const uint64_t *parties_ids, const hash_chunk sid);
+void         cmp_party_free (cmp_party_t *party);
 
 void cmp_key_generation_init         (cmp_party_t *party);
 void cmp_key_generation_clean        (cmp_party_t *party);
@@ -297,14 +366,32 @@ void cmp_refresh_aux_info_round_2_exec (cmp_party_t *party);
 void cmp_refresh_aux_info_round_3_exec (cmp_party_t *party);
 void cmp_refresh_aux_info_final_exec   (cmp_party_t *party);
 
-void cmp_presign_init         (cmp_party_t *party);
-void cmp_presign_clean        (cmp_party_t *party);
-void cmp_presign_round_1_exec (cmp_party_t *party);
-void cmp_presign_round_2_exec (cmp_party_t *party);
-void cmp_presign_round_3_exec (cmp_party_t *party);
-void cmp_presign_final_exec   (cmp_party_t *party);
+// ECDSA Signature
 
-void cmp_signature_share (scalar_t r, scalar_t sigma, const cmp_party_t *party, const scalar_t msg);
+void cmp_ecdsa_presign_init         (cmp_party_t *party);
+void cmp_ecdsa_presign_clean        (cmp_party_t *party);
+void cmp_ecdsa_presign_round_1_exec (cmp_party_t *party);
+void cmp_ecdsa_presign_round_2_exec (cmp_party_t *party);
+void cmp_ecdsa_presign_round_3_exec (cmp_party_t *party);
+void cmp_ecdsa_presign_final_exec   (cmp_party_t *party);
+
+void cmp_ecdsa_signing_init         (cmp_party_t *party);
+void cmp_ecdsa_signing_clean        (cmp_party_t *party);
+void cmp_ecdsa_signing_round_1_exec (const cmp_party_t *party, const scalar_t msg);
+void cmp_ecdsa_signing_final_exec   (scalar_t r, scalar_t s, const cmp_party_t *party);
+
+// Schnorr Signature (EdDSA)
+
+void cmp_schnorr_presign_init         (cmp_party_t *party);
+void cmp_schnorr_presign_clean        (cmp_party_t *party);
+void cmp_schnorr_presign_round_1_exec (cmp_party_t *party);
+void cmp_schnorr_presign_round_2_exec (cmp_party_t *party);
+void cmp_schnorr_presign_final_exec   (cmp_party_t *party);
+
+void cmp_schnorr_signing_init         (cmp_party_t *party);
+void cmp_schnorr_signing_clean        (cmp_party_t *party);
+void cmp_schnorr_signing_round_1_exec (const cmp_party_t *party, const scalar_t msg);
+void cmp_schnorr_signing_final_exec   (scalar_t r, scalar_t s, const cmp_party_t *party);
 
 void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, uint64_t round, const uint8_t *bytes, uint64_t byte_len);
 void cmp_comm_receive_bytes(uint64_t my_index, uint64_t to_index, uint64_t round, uint8_t *bytes, uint64_t byte_len);

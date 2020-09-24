@@ -41,7 +41,7 @@ Ring pedersen evaluation: key generation and commiting.
 **zkp_<...>:**
 Zero knowledge proof of relevant claim. Allows proving and verifying claims, and for Schnorr proof also commiting before proving.
 
-**cmp_ecdsa_protocol:**
+**cmp_protocol:**
 All phases of the ECDSA protocol: key generation, refresh auxiliary information, pre-signing, signing.
 Each of the phases is implemented in a few rounds, except signing which is non-interactive.
 
