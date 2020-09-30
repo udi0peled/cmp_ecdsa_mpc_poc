@@ -442,7 +442,9 @@ void get_public_key(gr_elem_t pubkey, const cmp_party_t *party)
   }
 }
 
-void execute_presign (cmp_party_t *party)
+// ECDSA
+
+void execute_ecdsa_presign (cmp_party_t *party)
 {
   cmp_ecdsa_presign_init(party);
   cmp_ecdsa_presign_round_1_exec(party);
@@ -452,7 +454,7 @@ void execute_presign (cmp_party_t *party)
   cmp_ecdsa_presign_clean(party);
 }
 
-int signature_verify( const cmp_party_t *party, const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
+int verify_ecdsa_signature( const cmp_party_t *party, const scalar_t r, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
 {
   gr_elem_t result = group_elem_new(party->ec);
 
@@ -475,7 +477,7 @@ int signature_verify( const cmp_party_t *party, const scalar_t r, const scalar_t
   return is_valid;
 }
 
-void execute_signing (cmp_party_t *party)
+void execute_ecdsa_signing (cmp_party_t *party)
 {
   scalar_t s     = scalar_new();
   scalar_t r     = scalar_new();
@@ -499,18 +501,81 @@ void execute_signing (cmp_party_t *party)
   printBIGNUM("s = ", s, "\n");
   printECPOINT("pubkey = ", pubkey, party->ec, "\n", 1);
 
-  assert(signature_verify(party, r, s, msg, pubkey));
+  assert(verify_ecdsa_signature(party, r, s, msg, pubkey));
 
   printf("### Verified!\n");
 
   scalar_add(msg, msg, msg, party->ec_order);
-  assert(signature_verify(party, r, s, msg, pubkey) == 0);
+  assert(verify_ecdsa_signature(party, r, s, msg, pubkey) == 0);
 
   scalar_free(r);
   scalar_free(s);
   scalar_free(msg);
   group_elem_free(pubkey);
 }
+
+// Schnorr/EDDSA
+
+void execute_schnorr_presign (cmp_party_t *party)
+{
+  cmp_schnorr_presign_init(party);
+  cmp_schnorr_presign_round_1_exec(party);
+  cmp_schnorr_presign_round_2_exec(party);
+  cmp_schnorr_presign_final_exec(party);
+  cmp_schnorr_presign_clean(party);
+}
+
+int verify_schnorr_signature( const cmp_party_t *party, const gr_elem_t R, const scalar_t s, const scalar_t msg, const gr_elem_t pubkey)
+{
+  gr_elem_t result = group_elem_new(party->ec);
+
+  group_operation(result, NULL, party->ec_gen, s, party->ec);
+  group_operation(result, result, pubkey, msg, party->ec);
+
+  int is_valid = group_elem_equal(result, R, party->ec);
+
+  group_elem_free(result);
+
+  return is_valid;
+}
+
+void execute_schnorr_signing (cmp_party_t *party)
+{
+  gr_elem_t R  = group_elem_new(party->ec);
+  scalar_t s   = scalar_new();
+  scalar_t msg = scalar_new();
+  
+  uint8_t *msg_bytes = party->sid;
+  scalar_from_bytes(msg, &msg_bytes, GROUP_ORDER_BYTES, 0);
+
+  // Validate Signature
+
+  gr_elem_t pubkey = group_elem_new(party->ec);
+  get_public_key(pubkey, party);
+
+  cmp_schnorr_signing_init(party);
+  cmp_schnorr_signing_round_1_exec(party, msg);
+  cmp_schnorr_signing_final_exec(R, s, party);
+  cmp_schnorr_signing_clean(party);
+
+  printBIGNUM("msg = ", msg, "\n");
+  printECPOINT("R = ", R, party->ec, "\n", 1);
+  printBIGNUM("s = ", s, "\n");
+  printECPOINT("pubkey = ", pubkey, party->ec, "\n", 1);
+
+  assert(verify_schnorr_signature(party, R, s, msg, pubkey));
+
+  printf("### Verified!\n");
+
+  scalar_add(msg, msg, msg, party->ec_order);
+  assert(verify_schnorr_signature(party, R, s, msg, pubkey) == 0);
+
+  group_elem_free(R);
+  scalar_free(s);
+  scalar_free(msg);
+  group_elem_free(pubkey);
+}
+
 
 int PRINT_VALUES;
 int PRINT_SECRETS;
@@ -520,7 +585,7 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values,
   PRINT_VALUES = print_values;
   PRINT_SECRETS = print_secrets;
   
-  hash_chunk  sid = "Fireblocks";
+  hash_chunk  sid = "Fireblocks!";
   uint64_t    *party_ids = calloc(num_parties, sizeof(uint64_t));
 
   // Initialize party ids
@@ -535,11 +600,17 @@ void test_protocol(uint64_t party_index, uint64_t num_parties, int print_values,
   printf("\n\n### Refrsh and Auxliarty Information\n\n");
   execute_refresh_and_aux_info(party);
 
-  printf("\n\n### PreSign\n\n");
-  execute_presign(party);
+  printf("\n\n### ECDSA PreSign\n\n");
+  execute_ecdsa_presign(party);
 
-  printf("\n\n### Signing\n\n");
-  execute_signing(party);
+  printf("\n\n### ECDSA Signing\n\n");
+  execute_ecdsa_signing(party);
+
+  printf("\n\n### Schnorr PreSign\n\n");
+  execute_schnorr_presign(party);
+
+  printf("\n\n### Schnorr Signing\n\n");
+  execute_schnorr_signing(party);
 
   cmp_party_free(party);
   free(party_ids);

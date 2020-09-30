@@ -297,7 +297,6 @@ typedef struct
 {
   cmp_signing_payload_t **payload;
   scalar_t sigma;
-  scalar_t r;
 } cmp_schnorr_signing_data_t;
 
 
@@ -391,7 +390,7 @@ void cmp_schnorr_presign_final_exec   (cmp_party_t *party);
 void cmp_schnorr_signing_init         (cmp_party_t *party);
 void cmp_schnorr_signing_clean        (cmp_party_t *party);
 void cmp_schnorr_signing_round_1_exec (const cmp_party_t *party, const scalar_t msg);
-void cmp_schnorr_signing_final_exec   (scalar_t r, scalar_t s, const cmp_party_t *party);
+void cmp_schnorr_signing_final_exec   (gr_elem_t r, scalar_t s, const cmp_party_t *party);
 
 void cmp_comm_send_bytes(uint64_t my_index, uint64_t to_index, uint64_t round, const uint8_t *bytes, uint64_t byte_len);
 void cmp_comm_receive_bytes(uint64_t my_index, uint64_t to_index, uint64_t round, uint8_t *bytes, uint64_t byte_len);

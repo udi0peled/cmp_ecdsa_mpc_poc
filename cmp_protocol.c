@@ -586,7 +586,7 @@ void cmp_key_generation_final_exec(cmp_party_t *party)
   
   // Set party's values, and update sid_hash to include srid and public_X
   scalar_copy(party->secret_x, kgd->secret_x);
-  //scalar_make_signed(party->secret_x, party->ec_order);
+
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     group_elem_copy(party->public_X[j], kgd->payload[j]->public_X);
@@ -2263,7 +2263,7 @@ void cmp_schnorr_presign_round_1_exec (cmp_party_t *party)
 
     assert(curr_send == send_bytes + send_bytes_len);
 
-    cmp_comm_send_bytes(party->index, j, 31, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 51, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -2310,7 +2310,7 @@ void  cmp_schnorr_presign_round_2_exec (cmp_party_t *party)
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue;
-    cmp_comm_receive_bytes(j, party->index, 31, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 51, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     scalar_coprime_from_bytes(preda->payload[j]->K, &curr_recv, 2*PAILLIER_MODULUS_BYTES, party->paillier_pub[j]->N, 1);
@@ -2418,13 +2418,13 @@ void  cmp_schnorr_presign_round_2_exec (cmp_party_t *party)
 
     assert(curr_send == send_bytes + send_bytes_len);
 
-    cmp_comm_send_bytes(party->index, j, 32, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 52, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
   // Print
 
-  printf("### Send (R, psi_logG_j) to each Party j.\t>>> %lu B\n", send_bytes_len);
+  printf("### Send (R, psi_logK_j) to each Party j.\t>>> %lu B\n", send_bytes_len);
   
   if (PRINT_VALUES)
   {
@@ -2458,7 +2458,7 @@ void  cmp_schnorr_presign_final_exec (cmp_party_t *party)
   {
     if (j == party->index) continue;
 
-    cmp_comm_receive_bytes(j, party->index, 32, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 52, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     group_elem_from_bytes(preda->payload[j]->R, &curr_recv, GROUP_ELEMENT_BYTES, party->ec, 1);
@@ -2478,21 +2478,23 @@ void  cmp_schnorr_presign_final_exec (cmp_party_t *party)
 
   assert(aux->info_len == aux_pos);
 
-  zkp_group_vs_paillier_range_public_t psi_logG_public_j;
-  psi_logG_public_j.x_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
-  psi_logG_public_j.rped_pub = party->rped_pub[party->index];
-  psi_logG_public_j.G = party->ec;
-  psi_logG_public_j.g = party->ec_gen;
+  zkp_group_vs_paillier_range_public_t psi_logK_public_j;
+  psi_logK_public_j.x_range_bytes = CALIGRAPHIC_I_ZKP_RANGE_BYTES;
+  psi_logK_public_j.rped_pub = party->rped_pub[party->index];
+  psi_logK_public_j.G = party->ec;
+  psi_logK_public_j.g = party->ec_gen;
   
-  int *verified_psi_logK     = calloc(party->num_parties, sizeof(int));
+  int *verified_psi_logK = calloc(party->num_parties, sizeof(int));
   for (uint64_t j = 0; j < party->num_parties; ++j)
   {
     if (j == party->index) continue; 
     
-    psi_logG_public_j.paillier_pub = party->paillier_pub[j];
-    psi_logG_public_j.X = preda->payload[j]->R;
-    psi_logG_public_j.C = preda->payload[j]->K;
-    verified_psi_logK[j] = zkp_group_vs_paillier_range_verify(preda->payload[j]->psi_logK, &psi_logG_public_j, aux);
+    zkp_aux_info_update(aux, sizeof(hash_chunk), &party->parties_ids[j], sizeof(uint64_t));
+    
+    psi_logK_public_j.paillier_pub = party->paillier_pub[j];
+    psi_logK_public_j.X = preda->payload[j]->R;
+    psi_logK_public_j.C = preda->payload[j]->K;
+    verified_psi_logK[j] = zkp_group_vs_paillier_range_verify(preda->payload[j]->psi_logK, &psi_logK_public_j, aux);
   }
 
   for (uint64_t j = 0; j < party->num_parties; ++j)
@@ -2501,7 +2503,6 @@ void  cmp_schnorr_presign_final_exec (cmp_party_t *party)
 
     if (verified_psi_logK[j] != 1) printf("%sParty %lu: failed verification of psi_logK from Party %lu\n",ERR_STR, party->index, j);
   }
-  
   free(verified_psi_logK);
   
   // Store R,k for party
@@ -2659,7 +2660,6 @@ void cmp_schnorr_signing_init (cmp_party_t *party)
   }
 
   sida->sigma = sida->payload[party->index]->sigma;
-  sida->r = scalar_new();
 }
 
 void cmp_schnorr_signing_clean (cmp_party_t *party)
@@ -2672,7 +2672,6 @@ void cmp_schnorr_signing_clean (cmp_party_t *party)
     free(sida->payload[i]);
   }
   free(sida->payload);
-  scalar_free(sida->r);
   free(sida);
 }
 
@@ -2682,17 +2681,12 @@ void cmp_schnorr_signing_round_1_exec (const cmp_party_t *party, const scalar_t 
 
   cmp_schnorr_signing_data_t *sida = party->schnorr_signing_data;
 
-  group_elem_get_x(sida->r, party->R, party->ec, party->ec_order);
-
   // Set current player's sigma
 
   scalar_t first_term = scalar_new();
-  scalar_t second_term = scalar_new();
-  scalar_mul(first_term, party->k, msg, party->ec_order);
-  scalar_mul(second_term, party->chi, sida->r, party->ec_order);
-  scalar_add(sida->sigma, first_term, second_term, party->ec_order);
+  scalar_mul(first_term, party->secret_x, msg, party->ec_order);
+  scalar_sub(sida->sigma, party->k, first_term, party->ec_order);
   scalar_free(first_term);
-  scalar_free(second_term);
 
   // Send sigma to others
 
@@ -2708,7 +2702,7 @@ void cmp_schnorr_signing_round_1_exec (const cmp_party_t *party, const scalar_t 
   {
     if (j == party->index) continue;
 
-    cmp_comm_send_bytes(party->index, j, 41, send_bytes, send_bytes_len);
+    cmp_comm_send_bytes(party->index, j, 61, send_bytes, send_bytes_len);
   }
   free(send_bytes);
 
@@ -2718,18 +2712,18 @@ void cmp_schnorr_signing_round_1_exec (const cmp_party_t *party, const scalar_t 
 
   if (PRINT_VALUES)
   {
-    printBIGNUM("r = ", sida->r, "\n");
+    printECPOINT("R = ", party->R, party->ec, "\n", 1);
     printf("sigma_%lu = ", party->index); printBIGNUM("", sida->sigma, "\n");
   }
 }
 
-void cmp_schnorr_signing_final_exec (scalar_t r, scalar_t s, const cmp_party_t *party)
+void cmp_schnorr_signing_final_exec (gr_elem_t R, scalar_t s, const cmp_party_t *party)
 {
   printf("### Finalization Round.\n");
 
   cmp_schnorr_signing_data_t *sida = party->schnorr_signing_data;
 
-  scalar_copy(r, sida->r);
+  group_elem_copy(R, party->R);
 
   // Receive sigma from others
 
@@ -2741,7 +2735,7 @@ void cmp_schnorr_signing_final_exec (scalar_t r, scalar_t s, const cmp_party_t *
   {
     if (j == party->index) continue;
 
-    cmp_comm_receive_bytes(j, party->index, 41, recv_bytes, recv_bytes_len);
+    cmp_comm_receive_bytes(j, party->index, 61, recv_bytes, recv_bytes_len);
     curr_recv = recv_bytes;
 
     scalar_from_bytes(sida->payload[j]->sigma, &curr_recv, GROUP_ORDER_BYTES, 1);
