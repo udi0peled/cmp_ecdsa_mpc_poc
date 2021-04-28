@@ -112,9 +112,8 @@ void time_paillier_encrypt(uint64_t reps, paillier_public_key_t *pub, unsigned l
     paillier_encryption_encrypt(ciphertext, plaintext, randomness, pub);
   }
 
-  //printf("plain = %s\nrandom = %s\ncipher = ", (plaintext), BN_bn2dec(randomness), BN_bn2dec(ciphertext), "\n");
-
   diff = clock() - start;
+
   printf("# %lu repetitions, time: %lu msec, avg: %f msec\n", reps, diff * 1000/ CLOCKS_PER_SEC, ((double) diff * 1000/ CLOCKS_PER_SEC) / reps);
 
   scalar_free(plaintext);
@@ -225,15 +224,19 @@ int main(int argc, char* argv[])
     }
     else if (strcmp(argv[1], "paillier") == 0)
     {
+      uint64_t reps = 1000;
+
       if (argc >= 3) modulus_bits = strtoul(argv[2], NULL, 10);
+      if (argc >= 4) reps = strtoul(argv[3], NULL, 10);
 
-      paillier_private_key_t *priv = time_paillier_generate_keys(modulus_bits);
+      paillier_private_key_t *paillier_priv = time_paillier_generate_keys(modulus_bits);
+      paillier_public_key_t  *paillier_pub = paillier_encryption_public_new();
 
-      test_paillier_operations(priv);
+      test_paillier_operations(paillier_priv);
 
-      // time_paillier_encrypt(100, &priv->pub, 0, 0);
+      time_paillier_encrypt(reps, paillier_pub, 0, 0);
 
-      paillier_encryption_free_keys(priv, NULL);
+      paillier_encryption_free_keys(paillier_priv, NULL);
 
       return 0;
     }

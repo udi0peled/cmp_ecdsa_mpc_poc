@@ -62,27 +62,41 @@ void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_proof_t *proof, const 
 
   BN_CTX *bn_ctx = BN_CTX_secure_new();
 
-  // Generate w with (-1, 1) Jacobi signs wrt (p,q) by CRT
+  // Generate random w with (-1, 1) Jacobi signs wrt (p,q)
+  // Use CRT to set w as -a^2 mod q and b^2 mod q for uniform a,b
 
-  scalar_t p_crt = scalar_new();
-  scalar_t q_crt = scalar_new();
+  scalar_t crt_mod_q_factor = scalar_new();
+  scalar_t crt_mod_p_factor = scalar_new();
+  scalar_t w_p_part = scalar_new();
+  scalar_t w_q_part = scalar_new();
 
-  BN_mod_inverse(p_crt, private->p, private->q, bn_ctx);
-  BN_mod_inverse(q_crt, private->q, private->p, bn_ctx);
-  BN_mod_mul(p_crt, p_crt, private->p, private->N, bn_ctx);
-  BN_mod_mul(q_crt, q_crt, private->q, private->N, bn_ctx);
-  BN_mod_sub(proof->w, p_crt, q_crt, private->N, bn_ctx);
+  BN_mod_inverse(crt_mod_q_factor, private->p, private->q, bn_ctx);
+  BN_mod_inverse(crt_mod_p_factor, private->q, private->p, bn_ctx);
+  BN_mod_mul(crt_mod_q_factor, crt_mod_q_factor, private->p, private->N, bn_ctx);
+  BN_mod_mul(crt_mod_p_factor, crt_mod_p_factor, private->q, private->N, bn_ctx);
+
+  BN_rand_range(w_p_part, private->p);
+  BN_rand_range(w_q_part, private->q);
+  BN_mod_sqr(w_p_part, w_p_part, private->p, bn_ctx);
+  BN_mod_sqr(w_q_part, w_q_part, private->q, bn_ctx);
+  BN_mod_mul(w_p_part, w_p_part, crt_mod_p_factor, private->N, bn_ctx);
+  BN_mod_mul(w_q_part, w_q_part, crt_mod_q_factor, private->N, bn_ctx);
+
+  BN_mod_sub(proof->w, w_q_part, w_p_part, private->N, bn_ctx);
 
   scalar_t y[STATISTICAL_SECURITY];
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i) y[i] = scalar_new();
 
   zkp_paillier_blum_challenge(y, proof, private->N, aux);
 
+  // The following is needed to compute z[i]
   scalar_t N_inverse_mod_phiN = scalar_new();
-  BN_mod_inverse(N_inverse_mod_phiN, private->N, private->phi_N, bn_ctx);    // To compute z[i]
+  BN_mod_inverse(N_inverse_mod_phiN, private->N, private->phi_N, bn_ctx);    
 
-  // Taking each y[i] 4th root (by exponent which is ((p-1)/4)^2 mod (p -1) - double sqrt
-  // Checking result^4 = y[i] or -y[i], which defined the legendre symbol
+  // We first compute each y[i] Legendre symbol pair (leg_q,leg_p) wrt (p,q), using Euler's Criterion (exp to (p-1)/2)
+  // Then change y to be QR mod N by y_qr = (-1)^a * w^b * y where a = (leg_q == 1) and b = (leg_p != leg_q) (by choice of w with symbols (-1,1))
+  // Then we can take y_qr's 4th root (wrt mod p and mod q seperately), by exponentation with ((prime+1)/4 mod (prime -1))
+  // Lastly with randomize the 4th root by randomly changing the signs mod p and mod q (before CRT to compute the root mod N).
 
   scalar_t p_minus_1 = BN_dup(private->p);
   scalar_t q_minus_1 = BN_dup(private->q);
@@ -90,71 +104,103 @@ void  zkp_paillier_blum_prove  (zkp_paillier_blum_modulus_proof_t *proof, const 
   BN_sub_word(p_minus_1, 1);
   BN_sub_word(q_minus_1, 1);
 
-  scalar_t p_exp_4th = BN_dup(private->p);
-  scalar_t q_exp_4th = BN_dup(private->q);
+  scalar_t p_euler_exp = BN_dup(p_minus_1);
+  scalar_t q_euler_exp = BN_dup(q_minus_1);
 
-  BN_add_word(p_exp_4th, 1);
-  BN_div_word(p_exp_4th, 4);
-  BN_mod_sqr(p_exp_4th, p_exp_4th, p_minus_1, bn_ctx);
+  BN_div_word(p_euler_exp, 2);
+  BN_div_word(q_euler_exp, 2);
 
-  BN_add_word(q_exp_4th, 1);
-  BN_div_word(q_exp_4th, 4);
-  BN_mod_sqr(q_exp_4th, q_exp_4th, q_minus_1, bn_ctx);
+  scalar_t p_exp_4th_root = BN_dup(private->p);
+  scalar_t q_exp_4th_root = BN_dup(private->q);
+
+  BN_add_word(p_exp_4th_root, 1);
+  BN_div_word(p_exp_4th_root, 4);
+  BN_mod_sqr(p_exp_4th_root, p_exp_4th_root, p_minus_1, bn_ctx);
+
+  BN_add_word(q_exp_4th_root, 1);
+  BN_div_word(q_exp_4th_root, 4);
+  BN_mod_sqr(q_exp_4th_root, q_exp_4th_root, q_minus_1, bn_ctx);
 
   scalar_t temp = scalar_new();
-  scalar_t y_mod_p = scalar_new();
-  scalar_t y_mod_q = scalar_new();
-  scalar_t p_4th_root = scalar_new();
-  scalar_t q_4th_root = scalar_new();
-  scalar_t p_computed_y = scalar_new();   // The 4th root, to the 4th power, gives y up to legendre symbol mod prime
-  scalar_t q_computed_y = scalar_new();
+  scalar_t y_qr = scalar_new();
+  scalar_t legendre_p = scalar_new();
+  scalar_t legendre_q = scalar_new();
+  scalar_t y_4th_root_mod_p = scalar_new();
+  scalar_t y_4th_root_mod_q = scalar_new();
 
-  uint8_t legendre_p;   // 0 is QR, 1 if QNR
-  uint8_t legendre_q;
+  // Sanity Check start...
+    BN_mod_exp(temp, proof->w, p_euler_exp, private->p, bn_ctx);
+    BN_mod_sub(temp, private->p, temp, private->p, bn_ctx);
+    assert(BN_is_one(temp));
+    BN_mod_exp(temp, proof->w, q_euler_exp, private->q, bn_ctx);
+    assert(BN_is_one(temp));
+  // ...end
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i)
   {
     BN_mod_exp(proof->z[i], y[i], N_inverse_mod_phiN, private->N, bn_ctx);
 
-    // Compute potential 4th root modulo prime, a get legendre symbol 0/1 using 4th power
-    BN_mod(y_mod_p, y[i], private->p, bn_ctx);
-    BN_mod_exp(p_4th_root, y_mod_p, p_exp_4th, private->p, bn_ctx);
-    BN_mod_sqr(temp, p_4th_root, private->p, bn_ctx);
-    BN_mod_sqr(p_computed_y, temp, private->p, bn_ctx);
-    legendre_p = BN_cmp(p_computed_y, y_mod_p) != 0;
+    // Compute Ledengre symbols of y, using Euler's criterion
+    BN_mod_exp(legendre_p, y[i], p_euler_exp, private->p, bn_ctx);
+    BN_mod_exp(legendre_q, y[i], q_euler_exp, private->q, bn_ctx);
 
-    BN_mod(y_mod_q, y[i], private->q, bn_ctx);
-    BN_mod_exp(q_4th_root, y_mod_q, q_exp_4th, private->q, bn_ctx);
-    BN_mod_sqr(temp, q_4th_root, private->q, bn_ctx);
-    BN_mod_sqr(q_computed_y, temp, private->q, bn_ctx);
-    legendre_q = BN_cmp(q_computed_y, y_mod_q) != 0;
+    // Sanity checks start...
+    assert(BN_is_one(legendre_p) != (BN_cmp(legendre_p, p_minus_1) == 0));
+    assert(BN_is_one(legendre_q) != (BN_cmp(legendre_q, q_minus_1) == 0));
+    // ...end
 
-    // CRT compute 4th root mod N (up to a,b later)
-    BN_mod_mul(p_4th_root, p_4th_root, q_crt, private->N, bn_ctx);
-    BN_mod_mul(q_4th_root, q_4th_root, p_crt, private->N, bn_ctx);
-    BN_mod_add(proof->x[i], p_4th_root, q_4th_root, private->N, bn_ctx);
+    // Derive a,b and compute fixed y_qr = (-1)^a * w^b * y
 
-    // According to choice of w above with (-1, 1) ledendre mod (p,q), and (-1)^a factor
-    proof->a[i] = legendre_q;                   
-    proof->b[i] = legendre_q != legendre_p;
+    proof->a[i] = BN_cmp(legendre_q, q_minus_1) == 0;
+    proof->b[i] = (BN_is_one(legendre_p) && (BN_cmp(legendre_q, q_minus_1) == 0)) ||
+                  (BN_is_one(legendre_q) && (BN_cmp(legendre_p, p_minus_1) == 0));
+
+    BN_copy(y_qr, y[i]);
+    if (proof->a[i]) BN_mod_sub(y_qr, private->N, y_qr, private->N, bn_ctx);
+    if (proof->b[i]) BN_mod_mul(y_qr, proof->w, y_qr, private->N, bn_ctx);
+
+    // Sanity Check start...
+    BN_mod_exp(temp, y_qr, p_euler_exp, private->p, bn_ctx);
+    assert(BN_is_one(temp));
+    BN_mod_exp(temp, y_qr, q_euler_exp, private->q, bn_ctx);
+    assert(BN_is_one(temp));
+    // ...end
+
+    // Compute x as random 4th root of fixed y_qr with CRT
+
+    BN_mod_exp(y_4th_root_mod_p, y_qr, p_exp_4th_root, private->p, bn_ctx);
+    BN_mod_exp(y_4th_root_mod_q, y_qr, q_exp_4th_root, private->q, bn_ctx);
+
+    // Randomly change mod p and mod q components signs, to get random 4th root
+    BN_rand(temp, 2, -1, 0);    // two random bits
+    if (BN_is_bit_set(temp, 0)) BN_mod_sub(y_4th_root_mod_p, private->p, y_4th_root_mod_p, private->p, bn_ctx);
+    if (BN_is_bit_set(temp, 1)) BN_mod_sub(y_4th_root_mod_q, private->q, y_4th_root_mod_q, private->q, bn_ctx);
+
+    BN_mod_mul(y_4th_root_mod_p, y_4th_root_mod_p, crt_mod_p_factor, private->N, bn_ctx);
+    BN_mod_mul(y_4th_root_mod_q, y_4th_root_mod_q, crt_mod_q_factor, private->N, bn_ctx);
+    BN_mod_add(proof->x[i], y_4th_root_mod_p, y_4th_root_mod_q, private->N, bn_ctx);
+
+    // Sanity Checks start...
+    BN_mod_sqr(temp, proof->x[i], private->N, bn_ctx);
+    BN_mod_sqr(temp, temp, private->N, bn_ctx);
+    assert(BN_cmp(temp, y_qr) == 0);
+    // ...end
   }
 
   for (uint64_t i = 0; i < STATISTICAL_SECURITY; ++i) scalar_free(y[i]);
 
   scalar_free(N_inverse_mod_phiN);
-  scalar_free(p_computed_y);
-  scalar_free(q_computed_y);
-  scalar_free(p_4th_root);
-  scalar_free(q_4th_root);
-  scalar_free(q_exp_4th);
-  scalar_free(p_exp_4th);
+  scalar_free(y_4th_root_mod_p);
+  scalar_free(y_4th_root_mod_q);
+  scalar_free(q_exp_4th_root);
+  scalar_free(p_exp_4th_root);
   scalar_free(p_minus_1);
   scalar_free(q_minus_1);
-  scalar_free(y_mod_q);
-  scalar_free(y_mod_p);
-  scalar_free(p_crt);
-  scalar_free(q_crt);
+  scalar_free(crt_mod_q_factor);
+  scalar_free(crt_mod_p_factor);
   scalar_free(temp);
+  scalar_free(w_p_part);
+  scalar_free(w_q_part);
   
   BN_CTX_free(bn_ctx);
 }
