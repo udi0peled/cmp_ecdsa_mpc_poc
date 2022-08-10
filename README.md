@@ -48,4 +48,4 @@ Each of the phases is implemented in a few rounds, except signing which is non-i
 
 ### License
 
-???
+MIT
